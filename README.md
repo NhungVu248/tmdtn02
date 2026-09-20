@@ -17,7 +17,7 @@ tmdtn02/
 ## Yêu cầu
 
 - Node.js >= 18 (khuyến nghị 20+)
-- MySQL đang chạy (ví dụ XAMPP). Mặc định cấu hình: user `root`, không mật khẩu, `localhost:3306`.
+- MySQL đang chạy (ví dụ XAMPP). Cấu hình hiện tại: user `root`, mật khẩu `123456`, `localhost:3306`.
 
 ---
 
@@ -34,13 +34,13 @@ npm install
 ```
 
 Tạo file `.env` (đã có sẵn `.env.example` để tham khảo). Kiểm tra `DATABASE_URL`
-khớp với MySQL của bạn. Với XAMPP mặc định:
+khớp với MySQL của bạn. Cấu hình mặc định của dự án (root có mật khẩu `123456`):
 
 ```
-DATABASE_URL="mysql://root:@localhost:3306/tmdt"
+DATABASE_URL="mysql://root:123456@localhost:3306/tmdt"
 ```
 
-Nếu MySQL của bạn có mật khẩu cho root, sửa thành:
+Nếu root của bạn dùng mật khẩu khác (hoặc không mật khẩu), sửa lại phần sau dấu `:`:
 
 ```
 DATABASE_URL="mysql://root:MAT_KHAU@localhost:3306/tmdt"
@@ -92,6 +92,14 @@ backend đã kết nối được với nhau.
 | POST   | `/api/auth/register` | Đăng ký (email, password, name) | Không |
 | POST   | `/api/auth/login`    | Đăng nhập (email, password)  | Không |
 | GET    | `/api/auth/me`       | Thông tin user hiện tại       | Bearer token |
+| GET    | `/api/catalog/home`  | UC-01: nổi bật + khu vực + khuyến mại | Không |
+| GET    | `/api/catalog/categories` | UC-01: cây danh mục (`?type=HOMESTAY\|TOUR`) | Không |
+| GET    | `/api/catalog/products` | UC-01/02: danh sách sản phẩm (`?categorySlug=&type=&location=`) | Không |
+| GET    | `/api/catalog/search` | UC-02: tìm kiếm & lọc (`?type=&destination=&from=&to=&depart=&guests=&minPrice=&maxPrice=&location=&amenities=&minRating=&duration=&sort=`) | Không |
+| GET    | `/api/catalog/products/:slug` | UC-03: chi tiết + ảnh + đánh giá (đã duyệt) + gợi ý tương tự | Không |
+| GET    | `/api/catalog/products/:slug/availability` | UC-03: tình trạng còn trống + giá tạm tính (homestay `?from=&to=&guests=`, tour `?date=&guests=&children=`) | Không |
+
+> Sau khi `prisma migrate`, nạp dữ liệu mẫu cho UC-01: `npm run db:seed` (trong `backend/`).
 
 Ví dụ đăng ký:
 

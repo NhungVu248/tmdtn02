@@ -7,6 +7,16 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum ProductType {
+  HOMESTAY
+  TOUR
+}
+
+enum ProductStatus {
+  VISIBLE
+  HIDDEN
+}
+
 model User {
   id        Int      @id @default(autoincrement())
   email     String   @unique
@@ -14,4 +24,126 @@ model User {
   name      String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+// Danh mục nhiều cấp (tự tham chiếu). BR-02: số cấp do quản trị viên cấu hình.
+model Category {
+  id        Int         @id @default(autoincrement())
+  name      String
+  slug      String      @unique
+  type      ProductType
+  order     Int         @default(0)
+  parentId  Int?
+  parent    Category?   @relation("CategoryTree", fields: [parentId], references: [id])
+  children  Category[]  @relation("CategoryTree")
+  products  Product[]
+  createdAt DateTime    @default(now())
+
+  @@index([parentId])
+  @@index([type])
+}
+
+// Sản phẩm: homestay hoặc tour.
+model Product {
+  id          Int           @id @default(autoincrement())
+  name        String
+  slug        String        @unique
+  type        ProductType
+  status      ProductStatus @default(VISIBLE)
+  description String?       @db.Text
+  location    String? // tỉnh/thành hoặc vùng miền
+  price       Int // giá cơ bản (đồng): homestay/đêm, tour/khách
+  rating      Float         @default(0)
+  thumbnail   String?
+  isFeatured  Boolean       @default(false)
+  amenities   String? // tiện nghi homestay, phân tách bằng dấu phẩy
+  durationDays Int? // thời lượng tour (số ngày)
+  priceChild  Int? // giá trẻ em cho tour (BR-09)
+  cancellationPolicy String? @db.Text // chính sách hủy
+  itinerary   String?       @db.Text // lịch trình tour
+  categoryId  Int?
+  category    Category?     @relation(fields: [categoryId], references: [id])
+  images         ProductImage[]
+  reviews        Review[]
+  availabilities HomestayAvailability[]
+  departures     TourDeparture[]
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@index([type])
+  @@index([status])
+  @@index([categoryId])
+  @@index([isFeatured])
+}
+
+// Thư viện ảnh của sản phẩm (UC-03).
+model ProductImage {
+  id        Int     @id @default(autoincrement())
+  productId Int
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  url       String
+  order     Int     @default(0)
+
+  @@index([productId])
+}
+
+// Đánh giá của khách. BR-08: chỉ hiển thị đánh giá đã được duyệt.
+model Review {
+  id         Int      @id @default(autoincrement())
+  productId  Int
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  authorName String
+  rating     Int
+  comment    String?  @db.Text
+  approved   Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  @@index([productId])
+  @@index([approved])
+}
+
+// Lịch tồn phòng homestay theo đêm (BR-07).
+model HomestayAvailability {
+  id          Int      @id @default(autoincrement())
+  productId   Int
+  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  date        DateTime @db.Date
+  totalRooms  Int
+  bookedRooms Int      @default(0)
+
+  @@unique([productId, date])
+  @@index([productId])
+}
+
+// Chuyến khởi hành của tour (BR-07).
+model TourDeparture {
+  id          Int      @id @default(autoincrement())
+  productId   Int
+  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  date        DateTime @db.Date
+  totalSeats  Int
+  bookedSeats Int      @default(0)
+
+  @@index([productId])
+}
+
+// Khu vực du lịch phổ biến hiển thị ở trang chủ.
+model Area {
+  id    Int     @id @default(autoincrement())
+  name  String
+  slug  String  @unique
+  image String?
+  order Int     @default(0)
+}
+
+// Chương trình khuyến mại đang chạy ở trang chủ.
+model Promotion {
+  id          Int      @id @default(autoincrement())
+  title       String
+  description String?
+  image       String?
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  @@index([active])
 }
