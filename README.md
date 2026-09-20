@@ -89,15 +89,25 @@ backend đã kết nối được với nhau.
 | Method | Endpoint             | Mô tả                        | Auth |
 |--------|----------------------|------------------------------|------|
 | GET    | `/api/health`        | Kiểm tra server              | Không |
-| POST   | `/api/auth/register` | Đăng ký (email, password, name) | Không |
-| POST   | `/api/auth/login`    | Đăng nhập (email, password)  | Không |
+| POST   | `/api/auth/register` | UC-05: đăng ký (email, password, confirmPassword, name, acceptedTerms) + gửi email xác thực | Không |
+| POST   | `/api/auth/verify-email` | UC-05: xác thực email (`{token}` hoặc `?token=`) | Không |
+| POST   | `/api/auth/resend-verification` | UC-05: gửi lại email xác thực (`{email}`) | Không |
+| POST   | `/api/auth/google`   | UC-05/06: đăng ký/đăng nhập bằng Google (`{credential}`) | Không |
+| GET    | `/api/auth/config`   | Cờ `googleEnabled` để frontend hiện/ẩn nút Google | Không |
+| POST   | `/api/auth/login`    | UC-06: đăng nhập (khóa sau 5 lần sai, chặn chưa xác thực) | Không |
+| POST   | `/api/auth/forgot-password` | UC-06: gửi email đặt lại mật khẩu (`{email}`) | Không |
+| POST   | `/api/auth/reset-password`  | UC-06: đặt lại mật khẩu (`{token, password}`) | Không |
 | GET    | `/api/auth/me`       | Thông tin user hiện tại       | Bearer token |
+| PUT    | `/api/auth/profile`  | UC-07: cập nhật hồ sơ (name, phone, address) | Bearer token |
+| PUT    | `/api/auth/password` | UC-07: đổi mật khẩu (currentPassword, newPassword) | Bearer token |
 | GET    | `/api/catalog/home`  | UC-01: nổi bật + khu vực + khuyến mại | Không |
 | GET    | `/api/catalog/categories` | UC-01: cây danh mục (`?type=HOMESTAY\|TOUR`) | Không |
 | GET    | `/api/catalog/products` | UC-01/02: danh sách sản phẩm (`?categorySlug=&type=&location=`) | Không |
 | GET    | `/api/catalog/search` | UC-02: tìm kiếm & lọc (`?type=&destination=&from=&to=&depart=&guests=&minPrice=&maxPrice=&location=&amenities=&minRating=&duration=&sort=`) | Không |
 | GET    | `/api/catalog/products/:slug` | UC-03: chi tiết + ảnh + đánh giá (đã duyệt) + gợi ý tương tự | Không |
 | GET    | `/api/catalog/products/:slug/availability` | UC-03: tình trạng còn trống + giá tạm tính (homestay `?from=&to=&guests=`, tour `?date=&guests=&children=`) | Không |
+| GET    | `/api/info` | UC-04: danh sách bài viết thông tin/chính sách đã công bố (`?category=ABOUT\|POLICY\|GUIDE`) | Không |
+| GET    | `/api/info/:slug` | UC-04: nội dung một bài viết | Không |
 
 > Sau khi `prisma migrate`, nạp dữ liệu mẫu cho UC-01: `npm run db:seed` (trong `backend/`).
 

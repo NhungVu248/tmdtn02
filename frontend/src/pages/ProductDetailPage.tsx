@@ -146,6 +146,9 @@ export function ProductDetailPage() {
             <section>
               <h2 className="mb-2 text-lg font-semibold">Chính sách hủy</h2>
               <p className="text-sm text-slate-600">{product.cancellationPolicy}</p>
+              <Link to="/info/chinh-sach-doi-tra-huy" className="mt-1 inline-block text-sm text-emerald-700 hover:underline">
+                Xem chính sách đổi – trả – hủy đầy đủ →
+              </Link>
             </section>
           )}
 

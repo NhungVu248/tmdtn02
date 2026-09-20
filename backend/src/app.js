@@ -3,6 +3,7 @@ import express from 'express'
 import { errorHandler, notFoundHandler } from './middleware/error.middleware.js'
 import authRoutes from './routes/auth.routes.js'
 import catalogRoutes from './routes/catalog.routes.js'
+import infoRoutes from './routes/info.routes.js'
 
 const app = express()
 
@@ -28,6 +29,7 @@ app.get('/api/health', (req, res) => {
 
 app.use('/api/auth', authRoutes)
 app.use('/api/catalog', catalogRoutes)
+app.use('/api/info', infoRoutes)
 
 app.use(notFoundHandler)
 app.use(errorHandler)

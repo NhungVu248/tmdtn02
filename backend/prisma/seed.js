@@ -11,6 +11,7 @@ async function main() {
   await prisma.category.deleteMany()
   await prisma.area.deleteMany()
   await prisma.promotion.deleteMany()
+  await prisma.infoArticle.deleteMany()
 
   // ----- Danh mục nhiều cấp -----
   // Homestay: Tỉnh/thành -> Khu vực -> Loại hình
@@ -149,11 +150,101 @@ async function main() {
     ],
   })
 
+  // ----- UC-04: Bài viết thông tin & chính sách (BR-10) + cẩm nang -----
+  const P = (arr) => arr.join('\n\n')
+  await prisma.infoArticle.createMany({
+    data: [
+      {
+        slug: 'gioi-thieu',
+        title: 'Thông tin người bán',
+        category: 'ABOUT',
+        order: 1,
+        excerpt: 'Thông tin về đơn vị vận hành nền tảng StayTour.',
+        content: P([
+          'StayTour là nền tảng đặt homestay và tour du lịch trực tuyến, kết nối du khách với các chủ homestay và đơn vị lữ hành trên khắp Việt Nam.',
+          'Đơn vị vận hành: Nhóm 09 – Đồ án môn Thương mại điện tử (CSE703102).',
+          'Địa chỉ: Trường Đại học ... · Email: support@staytour.example · Hotline: 1900 0000.',
+        ]),
+      },
+      {
+        slug: 'dieu-kien-giao-dich',
+        title: 'Điều kiện giao dịch chung',
+        category: 'POLICY',
+        order: 1,
+        excerpt: 'Quy định chung áp dụng cho mọi giao dịch trên nền tảng.',
+        content: P([
+          '1. Phạm vi áp dụng: các giao dịch đặt homestay và tour thực hiện qua nền tảng StayTour.',
+          '2. Giá và thanh toán: giá hiển thị đã bao gồm các loại phí theo quy định; phương thức thanh toán được nêu tại bước đặt.',
+          '3. Quyền và nghĩa vụ: người dùng cung cấp thông tin chính xác; nền tảng bảo đảm thông tin sản phẩm đúng như công bố.',
+        ]),
+      },
+      {
+        slug: 'chinh-sach-doi-tra-huy',
+        title: 'Chính sách đổi – trả – hủy',
+        category: 'POLICY',
+        order: 2,
+        excerpt: 'Điều kiện hoàn/hủy đơn đặt homestay và tour.',
+        content: P([
+          'Miễn phí hủy trong vòng 24 giờ sau khi đặt.',
+          'Hủy trước 7 ngày so với ngày nhận phòng/khởi hành: hoàn 100%.',
+          'Hủy trong vòng 3–7 ngày: hoàn 50%. Hủy trong vòng 3 ngày: không hoàn tiền.',
+          'Yêu cầu đổi/hủy được gửi qua tài khoản hoặc hotline hỗ trợ.',
+        ]),
+      },
+      {
+        slug: 'bao-mat-du-lieu',
+        title: 'Chính sách bảo vệ dữ liệu cá nhân',
+        category: 'POLICY',
+        order: 3,
+        excerpt: 'Cách nền tảng thu thập, sử dụng và bảo vệ dữ liệu người dùng.',
+        content: P([
+          'Chúng tôi thu thập thông tin cần thiết để xử lý đặt chỗ: họ tên, liên hệ, thông tin đặt.',
+          'Dữ liệu được sử dụng cho mục đích cung cấp dịch vụ và không chia sẻ cho bên thứ ba ngoài phạm vi giao dịch.',
+          'Người dùng có quyền yêu cầu truy cập, chỉnh sửa hoặc xóa dữ liệu cá nhân của mình.',
+        ]),
+      },
+      {
+        slug: 'kinh-nghiem-du-lich-da-lat',
+        title: 'Kinh nghiệm du lịch Đà Lạt',
+        category: 'GUIDE',
+        order: 1,
+        excerpt: 'Gợi ý thời điểm, di chuyển và điểm đến khi tới Đà Lạt.',
+        content: P([
+          'Thời điểm đẹp: tháng 11–12 mùa hoa dã quỳ, tháng 3 mùa mai anh đào.',
+          'Di chuyển: xe khách giường nằm hoặc máy bay tới Liên Khương, sau đó thuê xe máy dạo quanh thành phố.',
+          'Điểm đến gợi ý: hồ Tuyền Lâm, đồi chè Cầu Đất, chợ đêm Đà Lạt.',
+        ]),
+      },
+      {
+        slug: 'chuan-bi-trekking-tay-bac',
+        title: 'Chuẩn bị cho chuyến trekking Tây Bắc',
+        category: 'GUIDE',
+        order: 2,
+        excerpt: 'Danh sách đồ dùng và lưu ý an toàn khi trekking.',
+        content: P([
+          'Trang bị: giày trekking, áo giữ nhiệt, áo mưa, đèn pin, nước và đồ ăn nhẹ.',
+          'Sức khỏe: luyện thể lực trước chuyến đi; đi theo nhóm và hướng dẫn viên.',
+          'An toàn: theo dõi thời tiết, không tách đoàn, giữ liên lạc.',
+        ]),
+      },
+      // Bài CHƯA công bố -> dùng kiểm chứng ngoại lệ 2a (không tìm thấy).
+      {
+        slug: 'ban-nhap-chua-cong-bo',
+        title: 'Bản nháp chưa công bố',
+        category: 'GUIDE',
+        order: 99,
+        published: false,
+        content: 'Nội dung này chưa được công bố và KHÔNG được hiển thị.',
+      },
+    ],
+  })
+
   const counts = {
     categories: await prisma.category.count(),
     products: await prisma.product.count(),
     areas: await prisma.area.count(),
     promotions: await prisma.promotion.count(),
+    infoArticles: await prisma.infoArticle.count(),
   }
   console.log('Seed hoàn tất:', counts)
 }

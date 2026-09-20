@@ -24,12 +24,6 @@ export function BookingPage() {
   return <Stub title="Đặt chỗ (UC-09/UC-10)" note={`Sẽ phát triển ở luồng đặt. Sản phẩm: ${slug}`} />
 }
 
-// UC-04 – Thông tin & chính sách (chưa phát triển).
-export function InfoPage() {
-  const { slug } = useParams()
-  return <Stub title="Thông tin & chính sách (UC-04)" note={`Sẽ phát triển ở UC-04. Trang: ${slug}`} />
-}
-
 export function NotFoundPage() {
   return <Stub title="404 — Không tìm thấy trang" note="Đường dẫn không tồn tại." />
 }

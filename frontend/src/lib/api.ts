@@ -115,26 +115,69 @@ export interface Availability {
 
 export class ApiError extends Error {
   status: number
+  code?: string
   constructor(status: number, message: string) {
     super(message)
     this.status = status
   }
 }
 
-async function get<T>(path: string): Promise<T> {
-  const res = await fetch(`${API_URL}${path}`)
+export type InfoCategory = 'ABOUT' | 'POLICY' | 'GUIDE'
+
+export interface InfoSummary {
+  id: number
+  slug: string
+  title: string
+  category: InfoCategory
+  excerpt: string | null
+  updatedAt: string
+}
+
+export interface InfoArticle extends InfoSummary {
+  content: string
+  published: boolean
+}
+
+// Token đăng nhập hiện tại (do AuthProvider thiết lập) để gắn vào request cần xác thực.
+let authToken: string | null = null
+export function setAuthToken(token: string | null) {
+  authToken = token
+}
+
+async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const headers = new Headers(init?.headers)
+  if (authToken) headers.set('Authorization', `Bearer ${authToken}`)
+  const res = await fetch(`${API_URL}${path}`, { ...init, headers })
   if (!res.ok) {
     let message = `Yêu cầu thất bại (${res.status})`
+    let code: string | undefined
     try {
       const body = await res.json()
       if (body?.message) message = body.message
+      if (body?.code) code = body.code
     } catch {
       // giữ message mặc định
     }
-    throw new ApiError(res.status, message)
+    const err = new ApiError(res.status, message)
+    err.code = code
+    throw err
   }
   return res.json() as Promise<T>
 }
+
+const get = <T>(path: string) => request<T>(path)
+const post = <T>(path: string, body: unknown) =>
+  request<T>(path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+const put = <T>(path: string, body: unknown) =>
+  request<T>(path, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
 
 export const api = {
   getHome: () => get<HomeData>('/api/catalog/home'),
@@ -151,6 +194,52 @@ export const api = {
   getProductDetail: (slug: string) => get<DetailResponse>(`/api/catalog/products/${encodeURIComponent(slug)}`),
   checkAvailability: (slug: string, params: URLSearchParams) =>
     get<Availability>(`/api/catalog/products/${encodeURIComponent(slug)}/availability?${params.toString()}`),
+  getInfoList: () => get<{ articles: InfoSummary[] }>('/api/info'),
+  getInfoArticle: (slug: string) => get<{ article: InfoArticle }>(`/api/info/${encodeURIComponent(slug)}`),
+  register: (body: {
+    email: string
+    password: string
+    confirmPassword: string
+    name?: string
+    acceptedTerms: boolean
+  }) => post<RegisterResult>('/api/auth/register', body),
+  verifyEmail: (token: string) => post<{ message: string; email: string }>('/api/auth/verify-email', { token }),
+  resendVerification: (email: string) =>
+    post<{ message: string; devVerifyUrl?: string }>('/api/auth/resend-verification', { email }),
+  login: (email: string, password: string) => post<AuthResult>('/api/auth/login', { email, password }),
+  googleAuth: (credential: string) => post<AuthResult & { isNew: boolean }>('/api/auth/google', { credential }),
+  getAuthConfig: () => get<{ googleEnabled: boolean }>('/api/auth/config'),
+  forgotPassword: (email: string) =>
+    post<{ message: string; devResetUrl?: string }>('/api/auth/forgot-password', { email }),
+  resetPassword: (token: string, password: string) =>
+    post<{ message: string }>('/api/auth/reset-password', { token, password }),
+  getMe: () => get<{ user: AuthUser }>('/api/auth/me'),
+  updateProfile: (data: { name?: string; phone?: string; address?: string }) =>
+    put<{ user: AuthUser }>('/api/auth/profile', data),
+  changePassword: (currentPassword: string, newPassword: string) =>
+    put<{ message: string }>('/api/auth/password', { currentPassword, newPassword }),
+}
+
+export interface AuthUser {
+  id: number
+  email: string
+  name: string | null
+  phone?: string | null
+  address?: string | null
+  avatar?: string | null
+  emailVerified: boolean
+}
+
+export interface AuthResult {
+  token: string
+  user: AuthUser
+}
+
+export interface RegisterResult {
+  message: string
+  emailSent: boolean
+  email: string
+  devVerifyUrl?: string
 }
 
 export function formatPrice(v: number): string {
