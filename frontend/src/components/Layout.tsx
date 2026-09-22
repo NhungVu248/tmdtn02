@@ -18,7 +18,10 @@ export function Layout() {
               Thông tin & chính sách
             </Link>
             {user ? (
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-3">
+                <Link to="/favorites" className="text-slate-600 hover:text-emerald-700">
+                  ♡ Yêu thích
+                </Link>
                 <Link to="/profile" className="flex items-center gap-2 hover:text-emerald-700">
                   {user.avatar && <img src={user.avatar} alt="" className="h-7 w-7 rounded-full" />}
                   <span className="max-w-[10rem] truncate text-slate-700">{user.name || user.email}</span>

@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import { formatPrice, type Product } from '../lib/api'
+import { FavoriteButton } from './FavoriteButton'
 
 // Thẻ sản phẩm. Bấm vào -> UC-03 (Xem chi tiết) theo luồng thay thế 3a.
 export function ProductCard({ product }: { product: Product }) {
@@ -21,6 +22,7 @@ export function ProductCard({ product }: { product: Product }) {
         <span className="absolute left-2 top-2 rounded-full bg-black/60 px-2 py-0.5 text-xs font-medium text-white">
           {product.type === 'HOMESTAY' ? 'Homestay' : 'Tour'}
         </span>
+        <FavoriteButton productId={product.id} className="absolute right-2 top-2" />
       </div>
       <div className="p-3">
         <h3 className="line-clamp-1 font-semibold text-slate-900">{product.name}</h3>

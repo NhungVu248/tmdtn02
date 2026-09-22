@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { AvailabilityChecker } from '../components/AvailabilityChecker'
+import { FavoriteButton } from '../components/FavoriteButton'
 import { ProductCard } from '../components/ProductCard'
 import { ErrorState, Loading } from '../components/StateBlocks'
 import { ApiError, api, type DetailResponse } from '../lib/api'
@@ -100,7 +101,10 @@ export function ProductDetailPage() {
             <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">
               {isHomestay ? 'Homestay' : 'Tour'}
             </span>
-            <h1 className="mt-2 text-2xl font-bold">{product.name}</h1>
+            <div className="mt-2 flex items-start justify-between gap-3">
+              <h1 className="text-2xl font-bold">{product.name}</h1>
+              <FavoriteButton productId={product.id} className="mt-1 shrink-0 border border-slate-200" />
+            </div>
             <p className="mt-1 text-slate-500">
               📍 {product.location} · <span className="text-amber-500">★ {product.rating.toFixed(1)}</span>
               {reviews.length > 0 && <span className="text-slate-400"> ({reviews.length} đánh giá)</span>}

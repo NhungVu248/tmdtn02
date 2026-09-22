@@ -45,6 +45,29 @@ export async function sendVerificationEmail(to, verifyUrl) {
   return true
 }
 
+// Gửi email xác nhận đặt chỗ (UC-09/10). Nêu mã đơn, PIN (guest) và số tiền cọc.
+export async function sendBookingEmail(to, booking) {
+  const from = process.env.MAIL_FROM || 'StayTour <no-reply@staytour.example>'
+  const fmt = (n) => n.toLocaleString('vi-VN') + '₫'
+  const pinLine = booking.pin
+    ? `<p><strong>Mã PIN tra cứu:</strong> ${booking.pin} (giữ kín để tra cứu/hủy đơn)</p>`
+    : ''
+  const html = `
+    <p>Cảm ơn bạn đã đặt tại StayTour!</p>
+    <p><strong>Mã đơn:</strong> ${booking.code}</p>
+    ${pinLine}
+    <p><strong>Sản phẩm:</strong> ${booking.productName}</p>
+    <p><strong>Tổng tiền:</strong> ${fmt(booking.totalPrice)} · <strong>Đặt cọc:</strong> ${fmt(booking.depositAmount)} · <strong>Còn lại:</strong> ${fmt(booking.remainingAmount)}</p>
+    <p>Đơn đang ở trạng thái <strong>chờ đặt cọc</strong>. Vui lòng hoàn tất thanh toán cọc để xác nhận đơn.</p>
+  `
+  if (!transporter) {
+    console.log(`[MAILER dev] Xác nhận đặt chỗ tới ${to}: đơn ${booking.code}${booking.pin ? ' PIN ' + booking.pin : ''}`)
+    return true
+  }
+  await transporter.sendMail({ from, to, subject: `Xác nhận đặt chỗ ${booking.code} — StayTour`, html })
+  return true
+}
+
 // Gửi email đặt lại mật khẩu (UC-06 1a).
 export async function sendPasswordResetEmail(to, resetUrl) {
   const from = process.env.MAIL_FROM || 'StayTour <no-reply@staytour.example>'

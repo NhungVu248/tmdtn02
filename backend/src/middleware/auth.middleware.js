@@ -1,5 +1,18 @@
 import jwt from 'jsonwebtoken'
 
+// Gắn req.user nếu có token hợp lệ, nhưng KHÔNG bắt buộc (dùng cho guest checkout).
+export function optionalAuth(req, res, next) {
+  const header = req.headers.authorization
+  if (header && header.startsWith('Bearer ')) {
+    try {
+      req.user = jwt.verify(header.slice('Bearer '.length), process.env.JWT_SECRET)
+    } catch {
+      // token sai -> coi như khách (guest)
+    }
+  }
+  next()
+}
+
 export function authenticate(req, res, next) {
   const header = req.headers.authorization
 

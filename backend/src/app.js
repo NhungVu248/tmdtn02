@@ -2,7 +2,9 @@ import cors from 'cors'
 import express from 'express'
 import { errorHandler, notFoundHandler } from './middleware/error.middleware.js'
 import authRoutes from './routes/auth.routes.js'
+import bookingsRoutes from './routes/bookings.routes.js'
 import catalogRoutes from './routes/catalog.routes.js'
+import favoritesRoutes from './routes/favorites.routes.js'
 import infoRoutes from './routes/info.routes.js'
 
 const app = express()
@@ -29,6 +31,8 @@ app.get('/api/health', (req, res) => {
 
 app.use('/api/auth', authRoutes)
 app.use('/api/catalog', catalogRoutes)
+app.use('/api/bookings', bookingsRoutes)
+app.use('/api/favorites', favoritesRoutes)
 app.use('/api/info', infoRoutes)
 
 app.use(notFoundHandler)

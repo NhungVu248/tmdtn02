@@ -218,6 +218,12 @@ export const api = {
     put<{ user: AuthUser }>('/api/auth/profile', data),
   changePassword: (currentPassword: string, newPassword: string) =>
     put<{ message: string }>('/api/auth/password', { currentPassword, newPassword }),
+  getFavorites: () => get<{ items: Product[] }>('/api/favorites'),
+  getFavoriteIds: () => get<{ ids: number[] }>('/api/favorites/ids'),
+  addFavorite: (productId: number) =>
+    post<{ favorited: boolean; productId: number }>('/api/favorites', { productId }),
+  removeFavorite: (productId: number) =>
+    request<{ favorited: boolean; productId: number }>(`/api/favorites/${productId}`, { method: 'DELETE' }),
 }
 
 export interface AuthUser {

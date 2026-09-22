@@ -203,6 +203,7 @@ Khởi động lại cả 2 server. Nút **"Đăng nhập bằng Google"** sẽ 
 - **UC-05** Đăng ký tài khoản + xác thực email + đăng ký bằng Google
 - **UC-06** Đăng nhập/đăng xuất (khóa sau 5 lần sai, quên/đặt lại mật khẩu, đăng nhập Google)
 - **UC-07** Quản lý hồ sơ cá nhân (cập nhật thông tin + đổi mật khẩu)
+- **UC-08** Quản lý danh sách yêu thích (lưu/bỏ homestay/tour, xem lại theo tài khoản)
 
 ---
 
@@ -221,6 +222,10 @@ Khởi động lại cả 2 server. Nút **"Đăng nhập bằng Google"** sẽ 
 | GET | `/api/auth/me` | Thông tin user hiện tại | Bearer |
 | PUT | `/api/auth/profile` | UC-07: cập nhật hồ sơ | Bearer |
 | PUT | `/api/auth/password` | UC-07: đổi mật khẩu | Bearer |
+| GET | `/api/favorites` | UC-08: danh sách yêu thích | Bearer |
+| GET | `/api/favorites/ids` | UC-08: id sản phẩm đã yêu thích | Bearer |
+| POST | `/api/favorites` | UC-08: thêm yêu thích (`{productId}`) | Bearer |
+| DELETE | `/api/favorites/:productId` | UC-08: bỏ yêu thích | Bearer |
 | GET | `/api/catalog/home` | UC-01: nổi bật + khu vực + khuyến mại | Không |
 | GET | `/api/catalog/categories` | UC-01: cây danh mục (`?type=HOMESTAY\|TOUR`) | Không |
 | GET | `/api/catalog/products` | UC-01/02: danh sách sản phẩm | Không |

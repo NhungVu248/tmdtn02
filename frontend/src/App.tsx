@@ -1,5 +1,6 @@
 import { BrowserRouter, Route, Routes } from 'react-router-dom'
 import { AuthProvider } from './lib/auth'
+import { FavoritesProvider } from './lib/favorites'
 import { Layout } from './components/Layout'
 import { RequireAuth } from './components/RequireAuth'
 import { CategoryPage } from './pages/CategoryPage'
@@ -12,13 +13,15 @@ import { VerifyEmailPage } from './pages/VerifyEmailPage'
 import { LoginPage } from './pages/LoginPage'
 import { ForgotPasswordPage, ResetPasswordPage } from './pages/PasswordPages'
 import { ProfilePage } from './pages/ProfilePage'
+import { WishlistPage } from './pages/WishlistPage'
 import { BookingPage, NotFoundPage } from './pages/Placeholders'
 
 function App() {
   return (
     <AuthProvider>
-      <BrowserRouter>
-        <Routes>
+      <FavoritesProvider>
+        <BrowserRouter>
+          <Routes>
         <Route element={<Layout />}>
           {/* UC-01 – Duyệt trang chủ & danh mục */}
           <Route index element={<HomePage />} />
@@ -55,10 +58,20 @@ function App() {
               </RequireAuth>
             }
           />
+          {/* UC-08 – Danh sách yêu thích (cần đăng nhập) */}
+          <Route
+            path="favorites"
+            element={
+              <RequireAuth>
+                <WishlistPage />
+              </RequireAuth>
+            }
+          />
           <Route path="*" element={<NotFoundPage />} />
         </Route>
-        </Routes>
-      </BrowserRouter>
+          </Routes>
+        </BrowserRouter>
+      </FavoritesProvider>
     </AuthProvider>
   )
 }
