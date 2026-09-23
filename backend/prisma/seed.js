@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client'
+import bcrypt from 'bcryptjs'
 
 const prisma = new PrismaClient()
 
@@ -7,11 +8,16 @@ const img = (id, w = 800) => `https://images.unsplash.com/${id}?auto=format&fit=
 
 async function main() {
   // Dọn dữ liệu cũ (giữ bảng User).
+  // Xóa Payment/Booking trước vì tham chiếu tới Product (khóa ngoại) — nếu có đơn
+  // thật đang giữ trong DB dev, reseed toàn bộ catalog vẫn cần dọn để tránh lỗi FK.
+  await prisma.payment.deleteMany()
+  await prisma.booking.deleteMany()
   await prisma.product.deleteMany()
   await prisma.category.deleteMany()
   await prisma.area.deleteMany()
   await prisma.promotion.deleteMany()
   await prisma.infoArticle.deleteMany()
+  await prisma.discountCode.deleteMany()
 
   // ----- Danh mục nhiều cấp -----
   // Homestay: Tỉnh/thành -> Khu vực -> Loại hình
@@ -239,12 +245,46 @@ async function main() {
     ],
   })
 
+  // ----- UC-12: Mã giảm giá mẫu (BR-48: bình thường do admin tạo qua UC-20) -----
+  const inDays = (n) => new Date(Date.now() + n * 86400000)
+  await prisma.discountCode.createMany({
+    data: [
+      { code: 'STAYTOUR10', type: 'PERCENT', value: 10, minOrderValue: 500000, scope: 'ALL', maxUses: 100, startAt: inDays(-30), endAt: inDays(60) },
+      { code: 'HOMESTAY50K', type: 'FIXED', value: 50000, minOrderValue: 300000, scope: 'HOMESTAY', maxUses: 50, startAt: inDays(-30), endAt: inDays(60) },
+      { code: 'TOUR15', type: 'PERCENT', value: 15, minOrderValue: 1000000, scope: 'TOUR', maxUses: 50, startAt: inDays(-30), endAt: inDays(60) },
+      // Đã hết hạn -> kiểm chứng ngoại lệ 2a.
+      { code: 'EXPIRED5', type: 'PERCENT', value: 5, scope: 'ALL', startAt: inDays(-60), endAt: inDays(-1) },
+      // Đã hết lượt -> kiểm chứng ngoại lệ 2b.
+      { code: 'USEDUP', type: 'FIXED', value: 100000, scope: 'ALL', maxUses: 1, usedCount: 1, startAt: inDays(-30), endAt: inDays(60) },
+      // Yêu cầu đơn tối thiểu rất cao -> kiểm chứng ngoại lệ 3a.
+      { code: 'VIP2TR', type: 'FIXED', value: 200000, minOrderValue: 20000000, scope: 'ALL', startAt: inDays(-30), endAt: inDays(60) },
+    ],
+  })
+
+  // ----- UC-24: Tài khoản quản trị mặc định (chỉ tạo nếu chưa có, không xóa admin cũ) -----
+  const adminUsername = process.env.SEED_ADMIN_USERNAME || 'admin'
+  const adminPassword = process.env.SEED_ADMIN_PASSWORD || 'Admin@123456'
+  const existingAdmin = await prisma.admin.findUnique({ where: { username: adminUsername } })
+  if (!existingAdmin) {
+    await prisma.admin.create({
+      data: {
+        username: adminUsername,
+        password: await bcrypt.hash(adminPassword, 10),
+        name: 'Quản trị viên',
+        role: 'SUPER_ADMIN',
+      },
+    })
+    console.log(`Đã tạo tài khoản admin mặc định: ${adminUsername} / ${adminPassword} (đổi mật khẩu ngay sau khi đăng nhập lần đầu)`)
+  }
+
   const counts = {
     categories: await prisma.category.count(),
     products: await prisma.product.count(),
     areas: await prisma.area.count(),
     promotions: await prisma.promotion.count(),
     infoArticles: await prisma.infoArticle.count(),
+    discountCodes: await prisma.discountCode.count(),
+    admins: await prisma.admin.count(),
   }
   console.log('Seed hoàn tất:', counts)
 }

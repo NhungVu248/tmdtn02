@@ -1,8 +1,26 @@
 import { BrowserRouter, Route, Routes } from 'react-router-dom'
 import { AuthProvider } from './lib/auth'
+import { AdminAuthProvider } from './lib/adminAuth'
 import { FavoritesProvider } from './lib/favorites'
 import { Layout } from './components/Layout'
+import { AdminLayout } from './components/AdminLayout'
 import { RequireAuth } from './components/RequireAuth'
+import { RequireAdminAuth } from './components/RequireAdminAuth'
+import { AdminLoginPage } from './pages/admin/AdminLoginPage'
+import { AdminDashboardPage } from './pages/admin/AdminDashboardPage'
+import { AdminHomestaysPage } from './pages/admin/AdminHomestaysPage'
+import { AdminHomestayFormPage } from './pages/admin/AdminHomestayFormPage'
+import { AdminHomestayCalendarPage } from './pages/admin/AdminHomestayCalendarPage'
+import { AdminToursPage } from './pages/admin/AdminToursPage'
+import { AdminTourFormPage } from './pages/admin/AdminTourFormPage'
+import { AdminTourDeparturesPage } from './pages/admin/AdminTourDeparturesPage'
+import { AdminOrdersPage } from './pages/admin/AdminOrdersPage'
+import { AdminOrderDetailPage } from './pages/admin/AdminOrderDetailPage'
+import { AdminUsersPage } from './pages/admin/AdminUsersPage'
+import { AdminDiscountsPage } from './pages/admin/AdminDiscountsPage'
+import { AdminReviewsPage } from './pages/admin/AdminReviewsPage'
+import { AdminReportsPage } from './pages/admin/AdminReportsPage'
+import { AdminConfigPage } from './pages/admin/AdminConfigPage'
 import { CategoryPage } from './pages/CategoryPage'
 import { HomePage } from './pages/HomePage'
 import { SearchPage } from './pages/SearchPage'
@@ -14,14 +32,57 @@ import { LoginPage } from './pages/LoginPage'
 import { ForgotPasswordPage, ResetPasswordPage } from './pages/PasswordPages'
 import { ProfilePage } from './pages/ProfilePage'
 import { WishlistPage } from './pages/WishlistPage'
-import { BookingPage, NotFoundPage } from './pages/Placeholders'
+import { BookingPage } from './pages/BookingPage'
+import { PaymentResultPage } from './pages/PaymentResultPage'
+import { OrderDetailPage, OrdersPage } from './pages/OrdersPage'
+import { TrackOrderPage } from './pages/TrackOrderPage'
+import { ReviewPage } from './pages/ReviewPage'
+import { NotFoundPage } from './pages/Placeholders'
 
 function App() {
   return (
     <AuthProvider>
       <FavoritesProvider>
-        <BrowserRouter>
-          <Routes>
+        <AdminAuthProvider>
+          <BrowserRouter>
+            <Routes>
+        {/* Nhóm D – Khu vực quản trị (/admin), hoàn toàn tách biệt với website chính:
+            provider, layout và guard riêng, không dùng chung với Route element={<Layout />} bên dưới. */}
+        <Route path="admin/login" element={<AdminLoginPage />} />
+        <Route
+          path="admin/*"
+          element={
+            <RequireAdminAuth>
+              <AdminLayout />
+            </RequireAdminAuth>
+          }
+        >
+          <Route index element={<AdminDashboardPage />} />
+          {/* UC-16 – Quản lý homestay & lịch tồn phòng */}
+          <Route path="homestays" element={<AdminHomestaysPage />} />
+          <Route path="homestays/new" element={<AdminHomestayFormPage />} />
+          <Route path="homestays/:id/edit" element={<AdminHomestayFormPage />} />
+          <Route path="homestays/:id/calendar" element={<AdminHomestayCalendarPage />} />
+          {/* UC-17 – Quản lý tour & ngày khởi hành */}
+          <Route path="tours" element={<AdminToursPage />} />
+          <Route path="tours/new" element={<AdminTourFormPage />} />
+          <Route path="tours/:id/edit" element={<AdminTourFormPage />} />
+          <Route path="tours/:id/departures" element={<AdminTourDeparturesPage />} />
+          {/* UC-18 – Quản lý đơn & xử lý hủy/hoàn tiền */}
+          <Route path="orders" element={<AdminOrdersPage />} />
+          <Route path="orders/:code" element={<AdminOrderDetailPage />} />
+          {/* UC-19 – Quản lý người dùng & phân quyền */}
+          <Route path="users" element={<AdminUsersPage />} />
+          {/* UC-20 – Quản lý mã khuyến mại */}
+          <Route path="discounts" element={<AdminDiscountsPage />} />
+          {/* UC-21 – Kiểm duyệt đánh giá */}
+          <Route path="reviews" element={<AdminReviewsPage />} />
+          {/* UC-22 – Báo cáo & thống kê */}
+          <Route path="reports" element={<AdminReportsPage />} />
+          {/* UC-23 – Cấu hình hệ thống & nhật ký */}
+          <Route path="settings" element={<AdminConfigPage />} />
+        </Route>
+
         <Route element={<Layout />}>
           {/* UC-01 – Duyệt trang chủ & danh mục */}
           <Route index element={<HomePage />} />
@@ -30,15 +91,9 @@ function App() {
           <Route path="search" element={<SearchPage />} />
           {/* UC-03 – Xem chi tiết & tình trạng còn trống */}
           <Route path="product/:slug" element={<ProductDetailPage />} />
-          {/* UC-09/10 – Đặt chỗ (placeholder). BR-19: cần đăng nhập. */}
-          <Route
-            path="booking/:slug"
-            element={
-              <RequireAuth>
-                <BookingPage />
-              </RequireAuth>
-            }
-          />
+          {/* UC-09/10 – Đặt homestay/tour (hỗ trợ guest checkout) + UC-11 thanh toán */}
+          <Route path="booking/:slug" element={<BookingPage />} />
+          <Route path="payment-result" element={<PaymentResultPage />} />
           {/* UC-04 – Xem thông tin & chính sách */}
           <Route path="info" element={<InfoIndexPage />} />
           <Route path="info/:slug" element={<InfoArticlePage />} />
@@ -67,10 +122,31 @@ function App() {
               </RequireAuth>
             }
           />
+          {/* UC-13 – Tra cứu & theo dõi đơn: "Đơn của tôi" (Customer) + tra cứu Guest */}
+          <Route
+            path="orders"
+            element={
+              <RequireAuth>
+                <OrdersPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="orders/:code"
+            element={
+              <RequireAuth>
+                <OrderDetailPage />
+              </RequireAuth>
+            }
+          />
+          <Route path="track" element={<TrackOrderPage />} />
+          {/* UC-15 – Guest đánh giá qua liên kết token trong email */}
+          <Route path="review" element={<ReviewPage />} />
           <Route path="*" element={<NotFoundPage />} />
         </Route>
-          </Routes>
-        </BrowserRouter>
+            </Routes>
+          </BrowserRouter>
+        </AdminAuthProvider>
       </FavoritesProvider>
     </AuthProvider>
   )

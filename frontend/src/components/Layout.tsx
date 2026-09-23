@@ -17,8 +17,14 @@ export function Layout() {
             <Link to="/info" className="text-slate-600 hover:text-emerald-700">
               Thông tin & chính sách
             </Link>
+            <Link to="/track" className="text-slate-600 hover:text-emerald-700">
+              Tra cứu đơn
+            </Link>
             {user ? (
               <div className="flex items-center gap-3">
+                <Link to="/orders" className="text-slate-600 hover:text-emerald-700">
+                  Đơn của tôi
+                </Link>
                 <Link to="/favorites" className="text-slate-600 hover:text-emerald-700">
                   ♡ Yêu thích
                 </Link>

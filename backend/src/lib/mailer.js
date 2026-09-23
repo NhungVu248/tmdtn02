@@ -52,6 +52,11 @@ export async function sendBookingEmail(to, booking) {
   const pinLine = booking.pin
     ? `<p><strong>Mã PIN tra cứu:</strong> ${booking.pin} (giữ kín để tra cứu/hủy đơn)</p>`
     : ''
+  // UC-13 (luồng thay thế 3a): liên kết tra cứu trực tiếp, không cần nhập lại mã đơn/PIN.
+  const clientUrl = process.env.CLIENT_URL || 'http://localhost:5173'
+  const trackUrl = booking.pin
+    ? `${clientUrl}/track?code=${encodeURIComponent(booking.code)}&pin=${encodeURIComponent(booking.pin)}`
+    : `${clientUrl}/orders`
   const html = `
     <p>Cảm ơn bạn đã đặt tại StayTour!</p>
     <p><strong>Mã đơn:</strong> ${booking.code}</p>
@@ -59,12 +64,91 @@ export async function sendBookingEmail(to, booking) {
     <p><strong>Sản phẩm:</strong> ${booking.productName}</p>
     <p><strong>Tổng tiền:</strong> ${fmt(booking.totalPrice)} · <strong>Đặt cọc:</strong> ${fmt(booking.depositAmount)} · <strong>Còn lại:</strong> ${fmt(booking.remainingAmount)}</p>
     <p>Đơn đang ở trạng thái <strong>chờ đặt cọc</strong>. Vui lòng hoàn tất thanh toán cọc để xác nhận đơn.</p>
+    <p><a href="${trackUrl}">Xem/theo dõi đơn của bạn</a></p>
   `
   if (!transporter) {
     console.log(`[MAILER dev] Xác nhận đặt chỗ tới ${to}: đơn ${booking.code}${booking.pin ? ' PIN ' + booking.pin : ''}`)
     return true
   }
   await transporter.sendMail({ from, to, subject: `Xác nhận đặt chỗ ${booking.code} — StayTour`, html })
+  return true
+}
+
+// Gửi email xác nhận hủy đơn (UC-14). BR-60: nêu rõ mức hoàn tiền áp dụng.
+export async function sendCancellationEmail(to, info) {
+  const from = process.env.MAIL_FROM || 'StayTour <no-reply@staytour.example>'
+  const fmt = (n) => n.toLocaleString('vi-VN') + '₫'
+  const refundLine =
+    info.refundAmount > 0
+      ? `<p>Số tiền hoàn: <strong>${fmt(info.refundAmount)}</strong> (${info.ratio}% khoản đã thanh toán). Yêu cầu hoàn tiền đã được ghi nhận và sẽ được xử lý trong thời gian sớm nhất.</p>`
+      : `<p>Đơn không phát sinh khoản hoàn tiền theo chính sách hủy hiện hành.</p>`
+  const html = `
+    <p>Đơn <strong>${info.code}</strong> (${info.productName}) của bạn đã được hủy thành công.</p>
+    ${refundLine}
+    <p>Nếu đây không phải yêu cầu của bạn, vui lòng liên hệ hỗ trợ ngay.</p>
+  `
+  if (!transporter) {
+    console.log(`[MAILER dev] Xác nhận hủy đơn ${info.code} tới ${to}: hoàn ${info.refundAmount}đ (${info.ratio}%)`)
+    return true
+  }
+  await transporter.sendMail({ from, to, subject: `Xác nhận hủy đơn ${info.code} — StayTour`, html })
+  return true
+}
+
+// Gửi email mời đánh giá sau lưu trú (UC-15, BR-64). Chỉ dành cho Guest (Customer đánh giá qua "Đơn của tôi").
+export async function sendReviewInviteEmail(to, info) {
+  const from = process.env.MAIL_FROM || 'StayTour <no-reply@staytour.example>'
+  const html = `
+    <p>Cảm ơn bạn đã sử dụng dịch vụ tại StayTour!</p>
+    <p>Đơn <strong>${info.code}</strong> (${info.productName}) của bạn đã hoàn tất. Bạn có muốn chia sẻ trải nghiệm không?</p>
+    <p><a href="${info.reviewUrl}">Viết đánh giá</a></p>
+    <p>Liên kết chỉ dùng được một lần và có hiệu lực trong 30 ngày.</p>
+  `
+  if (!transporter) {
+    console.log(`[MAILER dev] Mời đánh giá đơn ${info.code} tới ${to}: ${info.reviewUrl}`)
+    return true
+  }
+  await transporter.sendMail({ from, to, subject: `Chia sẻ trải nghiệm của bạn — StayTour`, html })
+  return true
+}
+
+// UC-18 – Thông báo khi quản trị viên chuyển trạng thái đơn (BR-90).
+const ORDER_STATUS_LABEL = {
+  DEPOSITED: 'đã cọc',
+  CONFIRMED: 'đã xác nhận',
+  COMPLETED: 'hoàn tất',
+  CANCELLED: 'đã hủy',
+}
+export async function sendOrderStatusEmail(to, info) {
+  const from = process.env.MAIL_FROM || 'StayTour <no-reply@staytour.example>'
+  const label = ORDER_STATUS_LABEL[info.status] || info.status
+  const html = `
+    <p>Đơn <strong>${info.code}</strong> (${info.productName}) của bạn vừa được cập nhật sang trạng thái <strong>${label}</strong>.</p>
+    <p>Nếu có thắc mắc, vui lòng liên hệ hỗ trợ.</p>
+  `
+  if (!transporter) {
+    console.log(`[MAILER dev] Cập nhật trạng thái đơn ${info.code} tới ${to}: ${label}`)
+    return true
+  }
+  await transporter.sendMail({ from, to, subject: `Cập nhật đơn ${info.code} — StayTour`, html })
+  return true
+}
+
+// UC-18 – Thông báo khi yêu cầu hoàn tiền đã được xử lý (BR-87/90).
+export async function sendRefundProcessedEmail(to, info) {
+  const from = process.env.MAIL_FROM || 'StayTour <no-reply@staytour.example>'
+  const fmt = (n) => n.toLocaleString('vi-VN') + '₫'
+  const refLine = info.referenceCode ? `<p>Mã tham chiếu hoàn tiền: <strong>${info.referenceCode}</strong></p>` : ''
+  const html = `
+    <p>Yêu cầu hoàn tiền cho đơn <strong>${info.code}</strong> (${info.productName}) đã được xử lý.</p>
+    <p>Số tiền hoàn: <strong>${fmt(info.amount)}</strong></p>
+    ${refLine}
+  `
+  if (!transporter) {
+    console.log(`[MAILER dev] Đã xử lý hoàn tiền đơn ${info.code} tới ${to}: ${info.amount}đ`)
+    return true
+  }
+  await transporter.sendMail({ from, to, subject: `Hoàn tiền đơn ${info.code} đã xử lý — StayTour`, html })
   return true
 }
 

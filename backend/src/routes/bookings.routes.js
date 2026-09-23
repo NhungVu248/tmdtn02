@@ -1,11 +1,16 @@
 import { Router } from 'express'
-import { bookingConfig, createHomestayBooking } from '../controllers/bookings.controller.js'
+import {
+  bookingConfig,
+  createHomestayBooking,
+  createTourBooking,
+} from '../controllers/bookings.controller.js'
 import { optionalAuth } from '../middleware/auth.middleware.js'
 
 const router = Router()
 
-// UC-09 – hỗ trợ cả guest checkout lẫn thành viên (optionalAuth).
+// UC-09/10 – hỗ trợ cả guest checkout lẫn thành viên (optionalAuth).
 router.get('/config', bookingConfig)
 router.post('/homestay', optionalAuth, createHomestayBooking)
+router.post('/tour', optionalAuth, createTourBooking)
 
 export default router

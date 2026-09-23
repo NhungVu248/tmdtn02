@@ -253,12 +253,19 @@ export async function checkAvailability(req, res, next) {
         minRooms = Math.min(minRooms, free)
       }
       const available = minRooms >= 1
+      // BR-77: dùng giá riêng theo ngày (mùa/cuối tuần) do UC-16 thiết lập nếu có, ngược lại giá cơ bản.
+      const tentativePrice = available
+        ? nights.reduce((sum, night) => {
+            const row = byTime.get(night.getTime())
+            return sum + (row?.priceOverride ?? product.price)
+          }, 0)
+        : null
       return res.json({
         type: 'HOMESTAY',
         available,
         nights: nights.length,
         roomsLeft: available ? minRooms : 0,
-        tentativePrice: available ? product.price * nights.length : null, // BR-09
+        tentativePrice, // BR-09/BR-77
         message: available ? null : 'Không còn chỗ trống trong khoảng ngày đã chọn',
       })
     }
@@ -279,7 +286,8 @@ export async function checkAvailability(req, res, next) {
     const departure = await prisma.tourDeparture.findFirst({
       where: { productId: product.id, date: { gte: day, lt: nextDay } },
     })
-    if (!departure) {
+    // BR-79: chuyến đã đóng cũng coi như không mở để đặt.
+    if (!departure || departure.closed) {
       return res.json({
         type: 'TOUR',
         available: false,
@@ -292,9 +300,10 @@ export async function checkAvailability(req, res, next) {
     const seatsLeft = departure.totalSeats - departure.bookedSeats
     const totalGuests = guests + numChildren
     const available = seatsLeft >= totalGuests
-    const tentativePrice = available
-      ? product.price * guests + (product.priceChild ?? product.price) * numChildren // BR-09
-      : null
+    // BR-83: ưu tiên giá riêng theo chuyến (do UC-17 thiết lập) trước giá cơ bản của sản phẩm.
+    const adultPrice = departure.priceAdultOverride ?? product.price
+    const childPrice = departure.priceChildOverride ?? product.priceChild ?? product.price
+    const tentativePrice = available ? adultPrice * guests + childPrice * numChildren : null // BR-09/BR-83
     return res.json({
       type: 'TOUR',
       available,

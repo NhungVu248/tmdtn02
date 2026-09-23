@@ -1,8 +1,15 @@
 import crypto from 'crypto'
 import { prisma } from './prisma.js'
+import { createAndSendReviewInvite } from './review-token.js'
+import { getSystemConfig } from './config.js'
 
-export const DEPOSIT_RATE = Number(process.env.DEPOSIT_RATE || 0.3) // BR-26: tỷ lệ cọc
 export const HOLD_MINUTES = Number(process.env.HOLD_MINUTES || 15) // BR-25: hạn giữ chỗ
+
+// BR-26/BR-113: tỷ lệ cọc do UC-23 cấu hình (mặc định 30% nếu chưa từng cấu hình).
+export async function getDepositRate() {
+  const cfg = await getSystemConfig()
+  return cfg.depositRatePercent / 100
+}
 const DAY_MS = 86400000
 
 // ----- Ngày (UTC midnight, khớp cột @db.Date) -----
@@ -32,6 +39,53 @@ export function generatePin() {
 }
 export function hashPin(pin) {
   return crypto.createHash('sha256').update(pin).digest('hex')
+}
+
+// UC-15 – Chuyển trạng thái "chờ cọc/đã cọc/đã xác nhận" -> "hoàn tất" khi kỳ lưu trú/chuyến đi
+// đã kết thúc (giả thuyết UC-15: trạng thái đơn được cập nhật đúng khi kết thúc lưu trú/chuyến đi).
+// Hệ thống chưa có tác vụ nền định kỳ nên kiểm tra "lười" mỗi khi đơn được xem (UC-13).
+// Lần đầu chuyển sang "hoàn tất": nếu Guest thì sinh token + gửi email mời đánh giá (BR-64).
+export async function maybeCompleteBooking(booking) {
+  if (booking.status !== 'DEPOSITED' && booking.status !== 'CONFIRMED') return booking
+  const eventEnd = booking.type === 'HOMESTAY' ? booking.checkOut : booking.checkIn
+  if (!eventEnd || eventEnd >= new Date()) return booking
+
+  const updated = await prisma.booking.update({ where: { id: booking.id }, data: { status: 'COMPLETED' } })
+
+  if (!booking.userId) {
+    // Guest: gửi lời mời đánh giá kèm token dùng một lần (bỏ qua nếu đã có/gửi lỗi, không chặn luồng xem đơn).
+    createAndSendReviewInvite(booking).catch((e) => console.error('Gửi lời mời đánh giá thất bại:', e))
+  }
+  return { ...booking, ...updated }
+}
+
+// BR-32: giải phóng các chỗ giữ tạm đã quá hạn của một tour (trả lại số chỗ chuyến).
+export async function releaseExpiredTourHolds(productId) {
+  const expired = await prisma.booking.findMany({
+    where: {
+      productId,
+      type: 'TOUR',
+      status: 'PENDING_DEPOSIT',
+      heldUntil: { lt: new Date() },
+    },
+  })
+  for (const b of expired) {
+    const seats = (b.guests || 0) + (b.children || 0)
+    const departure = b.checkIn
+      ? await prisma.tourDeparture.findFirst({ where: { productId, date: b.checkIn } })
+      : null
+    await prisma.$transaction([
+      ...(departure
+        ? [
+            prisma.tourDeparture.update({
+              where: { id: departure.id },
+              data: { bookedSeats: { decrement: Math.min(seats, departure.bookedSeats) } },
+            }),
+          ]
+        : []),
+      prisma.booking.update({ where: { id: b.id }, data: { status: 'CANCELLED' } }),
+    ])
+  }
 }
 
 // BR-25: giải phóng các chỗ giữ tạm đã quá hạn của một homestay (trả lại tồn phòng).

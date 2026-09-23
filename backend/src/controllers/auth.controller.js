@@ -214,6 +214,11 @@ export async function googleAuth(req, res, next) {
       }
     }
 
+    // UC-19/BR-95: tài khoản bị quản trị viên khóa cũng không được đăng nhập qua Google.
+    if (user.disabled) {
+      return res.status(423).json({ message: 'Tài khoản đã bị khóa. Vui lòng liên hệ hỗ trợ.', code: 'DISABLED' })
+    }
+
     const token = signToken(user)
     res.json({ token, user: publicUser(user), isNew })
   } catch (err) {
@@ -236,6 +241,12 @@ export async function login(req, res, next) {
     if (!user || !user.password) {
       await logLoginAttempt(email, req, false)
       return res.status(401).json({ message: 'Sai email hoặc mật khẩu' })
+    }
+
+    // UC-19/BR-95: tài khoản bị quản trị viên khóa (khác với tạm khóa tự động do sai mật khẩu).
+    if (user.disabled) {
+      await logLoginAttempt(email, req, false)
+      return res.status(423).json({ message: 'Tài khoản đã bị khóa. Vui lòng liên hệ hỗ trợ.', code: 'DISABLED' })
     }
 
     // BR-16/2b: đang bị tạm khóa.

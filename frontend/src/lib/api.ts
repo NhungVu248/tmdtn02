@@ -224,6 +224,132 @@ export const api = {
     post<{ favorited: boolean; productId: number }>('/api/favorites', { productId }),
   removeFavorite: (productId: number) =>
     request<{ favorited: boolean; productId: number }>(`/api/favorites/${productId}`, { method: 'DELETE' }),
+  getBookingConfig: () => get<{ depositRate: number; holdMinutes: number }>('/api/bookings/config'),
+  createHomestayBooking: (data: {
+    slug: string
+    checkIn: string
+    checkOut: string
+    guests: number
+    guestName: string
+    guestEmail: string
+    guestPhone: string
+    acceptedTerms: boolean
+    discountCode?: string
+  }) => post<BookingResult>('/api/bookings/homestay', data),
+  createTourBooking: (data: {
+    slug: string
+    date: string
+    guests: number
+    children: number
+    guestName: string
+    guestEmail: string
+    guestPhone: string
+    acceptedTerms: boolean
+    discountCode?: string
+  }) => post<BookingResult>('/api/bookings/tour', data),
+  getPaymentConfig: () => get<{ vnpayEnabled: boolean; codEnabled: boolean; depositRate: number }>('/api/payments/config'),
+  createPayment: (code: string, method: 'COD' | 'VNPAY') =>
+    post<{ status: string; method?: string; redirectUrl?: string; booking?: { code: string; status: string } }>(
+      '/api/payments/create',
+      { code, method },
+    ),
+  applyDiscount: (data: { code: string; type: ProductType; subtotal: number; slug: string }) =>
+    post<{ applied: boolean; code?: string; discount?: number; newTotal?: number; message?: string }>(
+      '/api/discounts/apply',
+      data,
+    ),
+  getPaymentStatus: (code: string) =>
+    get<{
+      code: string
+      status: string
+      paymentMethod: string | null
+      totalPrice: number
+      depositAmount: number
+      remainingAmount: number
+      productName: string
+    }>(`/api/payments/status/${encodeURIComponent(code)}`),
+  getMyOrders: () => get<{ orders: OrderSummary[] }>('/api/orders/my'),
+  getMyOrder: (code: string) => get<{ order: OrderDetail }>(`/api/orders/my/${encodeURIComponent(code)}`),
+  lookupOrder: (data: { code: string; pin?: string; email?: string }) =>
+    post<{ order: OrderDetail }>('/api/orders/lookup', data),
+  cancelOrder: (code: string, guestAuth?: { pin?: string; email?: string }) =>
+    post<{ order: OrderDetail; refund: RefundPreview }>(`/api/orders/${encodeURIComponent(code)}/cancel`, guestAuth ?? {}),
+  getReviewContext: (token: string) =>
+    get<{ productName: string; productSlug: string; thumbnail: string | null; bookingCode: string }>(
+      `/api/reviews/token/${encodeURIComponent(token)}`,
+    ),
+  submitGuestReview: (data: { token: string; rating: number; comment?: string }) =>
+    post<{ message: string }>('/api/reviews/guest', data),
+  submitMyReview: (data: { code: string; rating: number; comment?: string }) =>
+    post<{ message: string }>('/api/reviews/my', data),
+}
+
+export interface RefundPreview {
+  eligible: boolean
+  reason: string | null
+  amountPaid: number
+  refundAmount: number
+  ratio: number
+}
+
+export interface OrderSummary {
+  code: string
+  type: ProductType
+  status: string
+  productName: string
+  productSlug: string
+  thumbnail: string | null
+  checkIn: string | null
+  checkOut: string | null
+  nights: number | null
+  guests: number
+  children?: number
+  totalPrice: number
+  depositAmount: number
+  remainingAmount: number
+  createdAt: string
+}
+
+export interface OrderDetail extends OrderSummary {
+  guestName: string
+  guestEmail: string
+  guestPhone: string
+  discountCode: string | null
+  discountAmount: number
+  paymentMethod: string | null
+  depositPaidAt: string | null
+  cancelledAt: string | null
+  cancellationPolicy: string | null
+  actions: { canCancel: boolean; canReview: boolean }
+  cancelPreview: RefundPreview
+}
+
+export interface BookingInfo {
+  code: string
+  type: ProductType
+  status: string
+  productName: string
+  productSlug: string
+  guestName: string
+  guestEmail: string
+  guestPhone: string
+  checkIn: string | null
+  checkOut: string | null
+  nights: number | null
+  guests: number
+  children?: number
+  totalPrice: number
+  discountCode?: string | null
+  discountAmount?: number
+  depositAmount: number
+  remainingAmount: number
+  heldUntil: string | null
+  createdAt: string
+}
+
+export interface BookingResult {
+  booking: BookingInfo
+  pin: string | null
 }
 
 export interface AuthUser {

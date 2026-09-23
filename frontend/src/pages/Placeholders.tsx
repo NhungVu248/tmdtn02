@@ -1,7 +1,4 @@
-import { Link, useParams } from 'react-router-dom'
-
-// Các trang thuộc use case khác của Nhóm A, tạo sẵn để luồng điều hướng hoạt động.
-// Sẽ được hiện thực ở UC-03, UC-04.
+import { Link } from 'react-router-dom'
 
 function Stub({ title, note }: { title: string; note: string }) {
   return (
@@ -16,12 +13,6 @@ function Stub({ title, note }: { title: string; note: string }) {
       </Link>
     </div>
   )
-}
-
-// UC-09/UC-10 – Đặt homestay/tour (chưa phát triển). Đích của nút "Đặt ngay" ở UC-03.
-export function BookingPage() {
-  const { slug } = useParams()
-  return <Stub title="Đặt chỗ (UC-09/UC-10)" note={`Sẽ phát triển ở luồng đặt. Sản phẩm: ${slug}`} />
 }
 
 export function NotFoundPage() {

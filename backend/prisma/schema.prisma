@@ -17,6 +17,80 @@ enum ProductStatus {
   HIDDEN
 }
 
+// Nhóm D – Quản trị (khu vực /admin, hoàn toàn tách biệt khỏi User của website chính).
+enum AdminRole {
+  SUPER_ADMIN // toàn quyền, bao gồm UC-19 cấp quyền cho admin khác
+  MANAGER // quản lý sản phẩm/đơn/khuyến mại/đánh giá, không cấp quyền tài khoản
+}
+
+model Admin {
+  id                  Int        @id @default(autoincrement())
+  username            String     @unique
+  password            String // BR-69: băm bcrypt
+  name                String?
+  role                AdminRole  @default(MANAGER) // BR-68: RBAC phía máy chủ
+  active              Boolean    @default(true) // BR-68: tài khoản bị khóa thì không đăng nhập được
+  failedLoginAttempts Int        @default(0) // BR-70
+  lockedUntil         DateTime? // BR-70
+  createdAt           DateTime   @default(now())
+  updatedAt           DateTime   @updatedAt
+
+  loginAttempts AdminLoginAttempt[]
+  auditLogs     AdminAuditLog[]
+
+  @@index([role])
+}
+
+// UC-24 – Ghi vết đăng nhập quản trị (BR-70/78).
+model AdminLoginAttempt {
+  id        Int      @id @default(autoincrement())
+  username  String
+  adminId   Int?
+  admin     Admin?   @relation(fields: [adminId], references: [id])
+  ip        String?
+  success   Boolean
+  reason    String? // vd: "wrong_password" | "not_admin" | "locked" | "inactive"
+  createdAt DateTime @default(now())
+
+  @@index([username])
+  @@index([adminId])
+}
+
+// UC-23 – Cấu hình hệ thống (BR-113/114): tham số nền cho UC-09/10/11 (tỷ lệ cọc) và
+// UC-14/18/04 (mốc thời gian + tỷ lệ hoàn tiền của chính sách hủy) + thông tin người bán.
+// Bảng chỉ có đúng 1 dòng (id luôn = 1) — không phải key/value vì tập tham số đã cố định theo đặc tả.
+model SystemConfig {
+  id                 Int      @id @default(1)
+  depositRatePercent Int      @default(30) // BR-113: % cọc, 1-100
+  cancelFreeHours    Int      @default(24) // miễn phí hủy trong X giờ đầu sau khi đặt
+  cancelTier1Days    Int      @default(7) // hủy trước >= X ngày so với ngày nhận/khởi hành -> cancelTier1Ratio
+  cancelTier1Ratio   Int      @default(100)
+  cancelTier2Days    Int      @default(3) // hủy trước >= X ngày (nhưng < tier1) -> cancelTier2Ratio; dưới X ngày -> 0%
+  cancelTier2Ratio   Int      @default(50)
+  sellerName         String?  @default("StayTour")
+  sellerAddress      String?
+  sellerPhone        String?
+  sellerEmail        String?
+  siteNotice         String?  @db.Text // thiết lập chung: thông báo/ghi chú hiển thị công khai (tùy chọn)
+  updatedAt          DateTime @updatedAt
+}
+
+// Nhóm D (BR-78, ...) – Nhật ký thao tác quản trị, dùng chung cho UC-16→23.
+model AdminAuditLog {
+  id         Int      @id @default(autoincrement())
+  adminId    Int
+  admin      Admin    @relation(fields: [adminId], references: [id])
+  action     String // vd: "product.create" | "product.hide" | "availability.block" ...
+  entityType String? // vd: "Product" | "HomestayAvailability"
+  entityId   Int?
+  detail     String?  @db.Text // mô tả/JSON ngắn gọn về thay đổi
+  createdAt  DateTime @default(now())
+
+  @@index([adminId])
+  @@index([action])
+  @@index([entityType, entityId])
+}
+
 model User {
   id            Int      @id @default(autoincrement())
   email         String   @unique
@@ -29,7 +103,8 @@ model User {
   emailVerified Boolean  @default(false) // BR-15: kích hoạt sau khi xác thực email
   acceptedTerms Boolean  @default(false) // BR-14: đồng ý điều khoản & chính sách
   failedLoginAttempts Int      @default(0) // BR-16: đếm lần đăng nhập sai liên tiếp
-  lockedUntil         DateTime? // BR-16/2b: thời điểm hết tạm khóa
+  lockedUntil         DateTime? // BR-16/2b: thời điểm hết tạm khóa (tự động, tạm thời)
+  disabled            Boolean  @default(false) // UC-19/BR-95: khóa bởi quản trị viên (thủ công, vĩnh viễn tới khi mở lại)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
@@ -82,13 +157,96 @@ model Booking {
   depositAmount   Int
   remainingAmount Int
 
+  // UC-11 – Thanh toán & đặt cọc
+  paymentMethod String? // VNPAY | COD
+  transactionId String? // mã giao dịch của cổng (BR-42)
+  depositPaidAt DateTime?
+
+  // UC-12 – Mã giảm giá (BR-44: chỉ một mã/đơn)
+  discountCode      String?
+  discountAmount    Int     @default(0)
+  discountConsumed  Boolean @default(false) // BR-47: chỉ trừ lượt khi đã cọc thành công
+
   heldUntil DateTime? // BR-25: hạn giữ chỗ tạm
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 
+  // UC-13 – Tra cứu đơn (Guest). BR-51: chống dò mã bằng khóa tạm sau nhiều lần sai.
+  lookupFailCount   Int       @default(0)
+  lookupLockedUntil DateTime?
+
+  // UC-14 – Hủy đơn & hoàn tiền
+  cancelledAt DateTime?
+
+  payments       Payment[]
+  refundRequests RefundRequest[]
+
+  // UC-15 – Đánh giá sau lưu trú
+  review      Review?
+  reviewToken ReviewToken?
+
   @@index([productId])
   @@index([userId])
   @@index([status])
+}
+
+// UC-14 – Yêu cầu hoàn tiền, chờ quản trị viên xử lý (UC-18). BR-59: ghi vết.
+model RefundRequest {
+  id        Int      @id @default(autoincrement())
+  bookingId Int
+  booking   Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  amount    Int
+  ratio     Int // % hoàn (0-100) theo chính sách tại thời điểm hủy
+  status    String   @default("PENDING") // PENDING | PROCESSED
+  createdAt DateTime @default(now())
+
+  @@index([bookingId])
+}
+
+// UC-13 – Nhật ký tra cứu đơn của Guest (BR-51: ghi vết chống dò mã).
+model LookupAttempt {
+  id        Int      @id @default(autoincrement())
+  code      String
+  ip        String?
+  success   Boolean
+  createdAt DateTime @default(now())
+
+  @@index([code])
+}
+
+// UC-12 – Mã giảm giá (BR-48: do quản trị viên tạo/cấu hình qua UC-20).
+model DiscountCode {
+  id            Int       @id @default(autoincrement())
+  code          String    @unique
+  type          String // PERCENT | FIXED
+  value         Int // % (1-100) nếu PERCENT, hoặc số tiền VND nếu FIXED
+  minOrderValue Int       @default(0)
+  scope         String    @default("ALL") // ALL | HOMESTAY | TOUR
+  productId     Int? // tùy chọn: giới hạn cho 1 sản phẩm cụ thể
+  product       Product?  @relation(fields: [productId], references: [id])
+  audience      String    @default("ALL") // ALL | CUSTOMER (chỉ thành viên đã đăng nhập)
+  startAt       DateTime?
+  endAt         DateTime?
+  maxUses       Int?
+  usedCount     Int       @default(0)
+  active        Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+
+  @@index([productId])
+}
+
+// UC-11 – Nhật ký giao dịch thanh toán (BR-41: ghi vết).
+model Payment {
+  id            Int      @id @default(autoincrement())
+  bookingId     Int
+  booking       Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  method        String // VNPAY | COD
+  amount        Int
+  status        String // SUCCESS | FAILED | PENDING
+  transactionId String?
+  createdAt     DateTime @default(now())
+
+  @@index([bookingId])
 }
 
 // UC-08 – Danh sách yêu thích (BR-22: gắn với tài khoản).
@@ -176,6 +334,8 @@ model Product {
   priceChild  Int? // giá trẻ em cho tour (BR-09)
   cancellationPolicy String? @db.Text // chính sách hủy
   itinerary   String?       @db.Text // lịch trình tour
+  included    String?       @db.Text // UC-17: mục bao gồm (mỗi dòng một mục)
+  excluded    String?       @db.Text // UC-17: mục không bao gồm
   categoryId  Int?
   category    Category?     @relation(fields: [categoryId], references: [id])
   images         ProductImage[]
@@ -184,6 +344,7 @@ model Product {
   departures     TourDeparture[]
   favorites      Favorite[]
   bookings       Booking[]
+  discountCodes  DiscountCode[]
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 
@@ -204,42 +365,61 @@ model ProductImage {
   @@index([productId])
 }
 
-// Đánh giá của khách. BR-08: chỉ hiển thị đánh giá đã được duyệt.
+// Đánh giá của khách. BR-08/BR-63: chỉ hiển thị đánh giá đã được duyệt.
 model Review {
   id         Int      @id @default(autoincrement())
   productId  Int
   product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  bookingId  Int?     @unique // UC-15/BR-61: gắn với đơn đã hoàn tất, mỗi đơn chỉ đánh giá 1 lần
+  booking    Booking? @relation(fields: [bookingId], references: [id])
   authorName String
   rating     Int
   comment    String?  @db.Text
   approved   Boolean  @default(false)
+  rejected   Boolean  @default(false) // UC-21/BR-104: từ chối/ẩn — phân biệt với "chờ kiểm duyệt" (cả 2 đều approved=false)
   createdAt  DateTime @default(now())
 
   @@index([productId])
   @@index([approved])
 }
 
-// Lịch tồn phòng homestay theo đêm (BR-07).
+// UC-15 – Token đánh giá dùng một lần cho Guest (BR-62), gửi trong email mời đánh giá.
+model ReviewToken {
+  id        Int       @id @default(autoincrement())
+  bookingId Int       @unique
+  booking   Booking   @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+}
+
+// Lịch tồn phòng homestay theo đêm (BR-07/74).
 model HomestayAvailability {
-  id          Int      @id @default(autoincrement())
-  productId   Int
-  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
-  date        DateTime @db.Date
-  totalRooms  Int
-  bookedRooms Int      @default(0)
+  id            Int      @id @default(autoincrement())
+  productId     Int
+  product       Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  date          DateTime @db.Date
+  totalRooms    Int // BR-74: 0 = chặn ngày (không mở bán)
+  bookedRooms   Int      @default(0)
+  priceOverride Int? // BR-74: giá riêng cho ngày này (mùa/cuối tuần); null = dùng Product.price
 
   @@unique([productId, date])
   @@index([productId])
 }
 
 // Chuyến khởi hành của tour (BR-07).
+// UC-17 – Chuyến khởi hành. BR-80/83: số chỗ + giá theo loại khách do admin thiết lập theo từng chuyến.
 model TourDeparture {
-  id          Int      @id @default(autoincrement())
-  productId   Int
-  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
-  date        DateTime @db.Date
-  totalSeats  Int
-  bookedSeats Int      @default(0)
+  id                  Int      @id @default(autoincrement())
+  productId           Int
+  product             Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  date                DateTime @db.Date
+  totalSeats          Int
+  bookedSeats         Int      @default(0)
+  priceAdultOverride  Int? // null = dùng Product.price
+  priceChildOverride  Int? // null = dùng Product.priceChild (hoặc price nếu không có)
+  closed              Boolean  @default(false) // UC-17 (4a): đóng/hủy chuyến chưa có khách
 
   @@index([productId])
 }

@@ -1,7 +1,7 @@
 # StayTour — Nền tảng đặt Homestay & Tour
 
 Dự án web full-stack (Bài tập lớn môn Thương mại điện tử — CSE703102, Đề số 09, Nhóm 09).
-Nền tảng cho phép người dùng **duyệt, tìm kiếm, xem chi tiết** homestay/tour và **quản lý tài khoản** (đăng ký, đăng nhập, hồ sơ).
+Nền tảng đặt **homestay & tour du lịch** hoàn chỉnh: duyệt/tìm kiếm/đặt chỗ/thanh toán (VNPAY sandbox thật + COD) phía khách hàng, và khu vực **quản trị** `/admin` riêng biệt để quản lý sản phẩm, đơn hàng, người dùng, khuyến mại, đánh giá, báo cáo và cấu hình hệ thống. Đã hoàn thành đầy đủ **24/24 use case** theo đặc tả (xem [mục 7](#7-tính-năng)).
 
 - **Frontend:** React 19 + Vite + TypeScript + Tailwind CSS + React Router
 - **Backend:** Express.js + Prisma + JWT + Nodemailer + Google OAuth
@@ -71,9 +71,13 @@ Nội dung tối thiểu cần có trong `backend/.env`:
 # Kết nối MySQL — sửa user/mật khẩu/tên DB cho khớp máy bạn
 DATABASE_URL="mysql://root:123456@localhost:3306/tmdt"
 
-# Chuỗi bí mật ký JWT — đổi thành chuỗi ngẫu nhiên dài
+# Chuỗi bí mật ký JWT (Customer) — đổi thành chuỗi ngẫu nhiên dài
 JWT_SECRET="doi_thanh_mot_chuoi_ngau_nhien_that_dai"
 JWT_EXPIRES_IN="7d"
+
+# Chuỗi bí mật RIÊNG cho token khu vực quản trị /admin (UC-24) — phải KHÁC JWT_SECRET ở trên
+ADMIN_JWT_SECRET="doi_thanh_mot_chuoi_ngau_nhien_khac_that_dai"
+ADMIN_JWT_EXPIRES_IN="8h"
 
 PORT=4000
 CLIENT_URL="http://localhost:5173"
@@ -99,6 +103,14 @@ Tạo sẵn homestay, tour, danh mục, khu vực, khuyến mại, bài viết c
 ```bash
 npm run db:seed
 ```
+
+Lệnh này cũng tạo **tài khoản quản trị mặc định** (chỉ khi chưa tồn tại): đăng nhập tại `http://localhost:5173/admin/login`.
+
+| Tài khoản | Mật khẩu |
+|---|---|
+| `admin` | `Admin@123456` |
+
+> Đổi mật khẩu ngay sau khi đăng nhập lần đầu, hoặc đặt `SEED_ADMIN_USERNAME`/`SEED_ADMIN_PASSWORD` trong `.env` trước khi seed để dùng thông tin khác.
 
 ---
 
@@ -189,6 +201,23 @@ Khi khởi động backend sẽ báo `• Email: SMTP (gửi thật)`.
 
 Khởi động lại cả 2 server. Nút **"Đăng nhập bằng Google"** sẽ tự hiện ở trang đăng ký/đăng nhập (nếu để trống thì nút tự ẩn).
 
+### 6.3. Thanh toán VNPAY (sandbox)
+
+Mặc định (không cấu hình), luồng đặt chỗ chỉ hiện phương thức **COD** (thanh toán khi nhận). Để bật thêm cổng thanh toán online sandbox:
+
+1. Đăng ký tài khoản merchant sandbox tại https://sandbox.vnpayment.vn (miễn phí, dùng cho mục đích học tập/thử nghiệm).
+2. Lấy **Terminal ID (TmnCode)** và **Secret Key (HashSecret)** từ email xác nhận/trang quản trị merchant.
+3. Thêm vào `backend/.env`:
+
+```env
+BACKEND_URL="http://localhost:4000"
+VNP_TMN_CODE="xxxxxxxx"
+VNP_HASH_SECRET="xxxxxxxxxxxxxxxx"
+VNP_URL="https://sandbox.vnpayment.vn/paymentv2/vpcpay.html"
+```
+
+Khởi động lại backend, sẽ báo `• VNPAY: BẬT`. Trang thanh toán sẽ hiện thêm lựa chọn VNPAY bên cạnh COD; dùng [thẻ test do VNPAY cung cấp](https://sandbox.vnpayment.vn/apis/vnpay-demo/) để thử giao dịch (không phải thẻ thật).
+
 ---
 
 ## 7. Tính năng
@@ -204,6 +233,26 @@ Khởi động lại cả 2 server. Nút **"Đăng nhập bằng Google"** sẽ 
 - **UC-06** Đăng nhập/đăng xuất (khóa sau 5 lần sai, quên/đặt lại mật khẩu, đăng nhập Google)
 - **UC-07** Quản lý hồ sơ cá nhân (cập nhật thông tin + đổi mật khẩu)
 - **UC-08** Quản lý danh sách yêu thích (lưu/bỏ homestay/tour, xem lại theo tài khoản)
+
+### Nhóm C — Đặt chỗ & Vòng đời đơn
+- **UC-09** Đặt homestay (giữ chỗ tạm chống đặt trùng, tính tiền + đặt cọc, hỗ trợ guest checkout với mã đơn + PIN)
+- **UC-10** Đặt tour (theo chuyến khởi hành, giá theo người lớn/trẻ em, giữ chỗ chống vượt số chỗ)
+- **UC-11** Thanh toán & đặt cọc (đặt cọc một phần, COD + VNPAY sandbox có xác minh chữ ký, chống thanh toán lặp)
+- **UC-12** Áp dụng mã giảm giá (kiểm tra hiệu lực/lượt dùng/điều kiện, tính lại cọc trên tổng sau giảm)
+- **UC-13** Tra cứu & theo dõi đơn ("Đơn của tôi" cho Customer, tra cứu bằng mã+PIN/email cho Guest, chống dò mã và IDOR)
+- **UC-14** Hủy đơn & nhận hoàn tiền (hoàn tiền tự động theo mốc thời gian, giải phóng chỗ, ghi nhận yêu cầu hoàn tiền)
+- **UC-15** Đánh giá sau lưu trú (chấm sao + nhận xét cho đơn đã hoàn tất, Guest qua token email, chờ kiểm duyệt trước khi hiển thị công khai)
+
+### Nhóm D — Quản trị (`/admin`, tách biệt hoàn toàn khỏi website chính)
+- **UC-24** Đăng nhập/Đăng xuất quản trị (bảng tài khoản riêng, secret JWT riêng, khóa sau 5 lần sai, ghi vết đăng nhập)
+- **UC-16** Quản lý homestay & lịch tồn phòng (thêm/sửa/gỡ hiển thị, tải ảnh có kiểm soát, mở/chặn ngày + giá theo mùa, chặn xung đột với đơn đang giữ chỗ)
+- **UC-17** Quản lý tour & ngày khởi hành (thêm/sửa/gỡ hiển thị, lịch trình + bao gồm/không bao gồm, quản lý chuyến khởi hành với số chỗ + giá riêng theo loại khách, chặn giảm chỗ dưới số đã bán và đóng chuyến đang có đơn)
+- **UC-18** Quản lý đơn & xử lý hủy/hoàn tiền (danh sách/chi tiết đơn kèm lọc, chuyển trạng thái đúng vòng đời chờ cọc→đã cọc→đã xác nhận→hoàn tất/đã hủy, tiếp nhận & xác nhận hoàn tiền từ UC-14 với đối soát số tiền, thông báo email khi đơn/hoàn tiền thay đổi)
+- **UC-19** Quản lý người dùng & phân quyền (khóa/mở khóa tài khoản khách hàng với cảnh báo nếu còn đơn đang xử lý, tạo/đổi vai trò/khóa tài khoản quản trị chỉ dành cho SUPER_ADMIN, luôn giữ tối thiểu 1 quản trị viên đang hoạt động)
+- **UC-20** Quản lý mã khuyến mại (tạo/sửa/bật-tắt mã, loại chiết khấu %/số tiền, điều kiện áp dụng đầy đủ, chặn mã trùng và dữ liệu không hợp lệ, sửa/tắt không hồi tố các đơn đã áp mã trước đó)
+- **UC-21** Kiểm duyệt đánh giá (danh sách chờ duyệt/đã duyệt/từ chối, duyệt cho hiển thị công khai, từ chối hoặc ẩn đánh giá đã duyệt trước đó khi phát hiện vi phạm)
+- **UC-22** Xem báo cáo & thống kê (chỉ đọc: doanh thu theo ngày trừ hoàn tiền, đơn theo trạng thái, tour bán chạy, công suất phòng homestay theo khoảng thời gian tùy chọn)
+- **UC-23** Cấu hình hệ thống & nhật ký (tỷ lệ đặt cọc và chính sách hủy/hoàn tiền nay do admin cấu hình thay vì hard-code, thông tin người bán, xem nhật ký thao tác quản trị + lịch sử đăng nhập, chỉ đọc và chỉ SUPER_ADMIN)
 
 ---
 
@@ -226,6 +275,61 @@ Khởi động lại cả 2 server. Nút **"Đăng nhập bằng Google"** sẽ 
 | GET | `/api/favorites/ids` | UC-08: id sản phẩm đã yêu thích | Bearer |
 | POST | `/api/favorites` | UC-08: thêm yêu thích (`{productId}`) | Bearer |
 | DELETE | `/api/favorites/:productId` | UC-08: bỏ yêu thích | Bearer |
+| GET | `/api/bookings/config` | UC-09: tỷ lệ cọc + hạn giữ chỗ | Không |
+| POST | `/api/bookings/homestay` | UC-09: đặt homestay (giữ chỗ, tạo đơn chờ cọc; hỗ trợ guest) | Tùy chọn |
+| POST | `/api/bookings/tour` | UC-10: đặt tour (theo chuyến khởi hành, giá người lớn/trẻ em) | Tùy chọn |
+| GET | `/api/payments/config` | UC-11: phương thức thanh toán khả dụng (COD, VNPAY) | Không |
+| POST | `/api/payments/create` | UC-11: tạo thanh toán cọc (`{code, method}`) | Tùy chọn |
+| GET | `/api/payments/vnpay-return` | UC-11: callback VNPAY (xác minh chữ ký) | Không |
+| GET | `/api/payments/status/:code` | UC-11: trạng thái thanh toán của đơn | Không |
+| POST | `/api/discounts/apply` | UC-12: kiểm tra & xem trước mã giảm giá (`{code, type, subtotal, slug}`) | Tùy chọn |
+| GET | `/api/orders/my` | UC-13: danh sách đơn của Customer ("Đơn của tôi") | Bearer |
+| GET | `/api/orders/my/:code` | UC-13: chi tiết đơn của Customer (chống IDOR) | Bearer |
+| POST | `/api/orders/lookup` | UC-13: Guest tra cứu bằng mã đơn + PIN/email (`{code, pin?, email?}`) | Không |
+| POST | `/api/orders/:code/cancel` | UC-14: hủy đơn + tính hoàn tiền tự động theo mốc thời gian | Tùy chọn (Customer hoặc Guest kèm pin/email) |
+| GET | `/api/reviews/token/:token` | UC-15: xem trước thông tin đơn qua token đánh giá (Guest) | Không |
+| POST | `/api/reviews/guest` | UC-15: Guest gửi đánh giá qua token dùng một lần (`{token, rating, comment?}`) | Không |
+| POST | `/api/reviews/my` | UC-15: Customer gửi đánh giá cho đơn của mình (`{code, rating, comment?}`) | Bearer |
+| POST | `/api/admin/auth/login` | UC-24: đăng nhập quản trị (`{username, password}`) | Không |
+| GET | `/api/admin/auth/me` | UC-24: thông tin quản trị viên hiện tại | Bearer (admin) |
+| GET | `/api/admin/homestays` | UC-16: danh sách homestay (mọi trạng thái, lọc `?status=&search=`) | Bearer (admin) |
+| POST | `/api/admin/homestays` | UC-16: tạo homestay mới (mặc định ẩn) | Bearer (admin) |
+| GET/PUT | `/api/admin/homestays/:id` | UC-16: xem/cập nhật chi tiết homestay | Bearer (admin) |
+| PATCH | `/api/admin/homestays/:id/visibility` | UC-16: hiển thị/gỡ hiển thị (`{status}`) | Bearer (admin) |
+| POST | `/api/admin/homestays/uploads/image` | UC-16: tải ảnh lên (multipart, JPEG/PNG/WEBP ≤5MB) | Bearer (admin) |
+| POST/DELETE | `/api/admin/homestays/:id/images(/:imageId)` | UC-16: gắn/gỡ ảnh khỏi homestay | Bearer (admin) |
+| GET/PUT | `/api/admin/homestays/:id/availability` | UC-16: xem/thiết lập lịch tồn phòng theo khoảng ngày (mở/chặn + giá riêng) | Bearer (admin) |
+| GET | `/api/admin/tours` | UC-17: danh sách tour (mọi trạng thái, lọc `?status=&search=`) | Bearer (admin) |
+| POST | `/api/admin/tours` | UC-17: tạo tour mới (mặc định ẩn) | Bearer (admin) |
+| GET/PUT | `/api/admin/tours/:id` | UC-17: xem/cập nhật chi tiết tour | Bearer (admin) |
+| PATCH | `/api/admin/tours/:id/visibility` | UC-17: hiển thị/gỡ hiển thị (`{status}`) | Bearer (admin) |
+| POST | `/api/admin/tours/uploads/image` | UC-17: tải ảnh lên (multipart, JPEG/PNG/WEBP ≤5MB) | Bearer (admin) |
+| POST/DELETE | `/api/admin/tours/:id/images(/:imageId)` | UC-17: gắn/gỡ ảnh khỏi tour | Bearer (admin) |
+| POST | `/api/admin/tours/:id/departures` | UC-17: thêm chuyến khởi hành (số chỗ + giá riêng theo loại khách) | Bearer (admin) |
+| PUT | `/api/admin/tours/:id/departures/:depId` | UC-17: cập nhật số chỗ/giá của một chuyến | Bearer (admin) |
+| PATCH | `/api/admin/tours/:id/departures/:depId/close` | UC-17: đóng/hủy chuyến (chặn nếu còn đơn) | Bearer (admin) |
+| GET | `/api/admin/orders` | UC-18: danh sách đơn (lọc `?status=&type=&from=&to=&search=`) | Bearer (admin) |
+| GET | `/api/admin/orders/:code` | UC-18: chi tiết đơn + lịch sử thanh toán + yêu cầu hoàn tiền | Bearer (admin) |
+| PATCH | `/api/admin/orders/:code/status` | UC-18: chuyển trạng thái đơn theo vòng đời (BR-85, `{status}`) | Bearer (admin) |
+| POST | `/api/admin/orders/:code/refunds/:refundId/process` | UC-18: xác nhận đã hoàn tiền (đối soát `{amount, referenceCode}`) | Bearer (admin) |
+| GET | `/api/admin/users/customers` | UC-19: danh sách khách hàng (lọc `?status=&search=`) | Bearer (admin) |
+| GET | `/api/admin/users/customers/:id` | UC-19: chi tiết khách hàng + đơn đang xử lý | Bearer (admin) |
+| PATCH | `/api/admin/users/customers/:id/lock` | UC-19: khóa/mở khóa khách hàng (`{disabled}`, BR-95) | Bearer (admin) |
+| GET | `/api/admin/users/admins` | UC-19: danh sách tài khoản quản trị | Bearer (SUPER_ADMIN) |
+| POST | `/api/admin/users/admins` | UC-19: tạo tài khoản quản trị mới (`{username,password,name,role}`) | Bearer (SUPER_ADMIN) |
+| PATCH | `/api/admin/users/admins/:id/role` | UC-19: đổi vai trò (BR-94 chặn hạ SUPER_ADMIN cuối cùng) | Bearer (SUPER_ADMIN) |
+| PATCH | `/api/admin/users/admins/:id/active` | UC-19: khóa/mở khóa quản trị viên (BR-94 chặn khóa admin hoạt động cuối cùng) | Bearer (SUPER_ADMIN) |
+| GET | `/api/admin/discounts` | UC-20: danh sách mã khuyến mại (lọc `?status=&search=`) | Bearer (admin) |
+| POST | `/api/admin/discounts` | UC-20: tạo mã mới (BR-99 chặn trùng, 4a validate) | Bearer (admin) |
+| GET/PUT | `/api/admin/discounts/:id` | UC-20: xem/cập nhật mã (BR-100 không hồi tố đơn cũ) | Bearer (admin) |
+| PATCH | `/api/admin/discounts/:id/active` | UC-20: bật/tắt mã (giữ lại để không mất dữ liệu thống kê) | Bearer (admin) |
+| GET | `/api/admin/reviews` | UC-21: danh sách đánh giá (lọc `?status=PENDING\|APPROVED\|REJECTED`) | Bearer (admin) |
+| PATCH | `/api/admin/reviews/:id/approve` | UC-21: duyệt cho hiển thị công khai (BR-103/105) | Bearer (admin) |
+| PATCH | `/api/admin/reviews/:id/reject` | UC-21: từ chối/ẩn đánh giá kể cả đã duyệt trước đó (BR-104/106) | Bearer (admin) |
+| GET | `/api/admin/reports` | UC-22: báo cáo doanh thu/đơn/tour bán chạy/công suất phòng (`?from=&to=`, mặc định 30 ngày gần nhất) | Bearer (admin) |
+| GET | `/api/admin/config` | UC-23: xem cấu hình hệ thống hiện tại | Bearer (admin) |
+| PUT | `/api/admin/config` | UC-23: cập nhật tỷ lệ cọc/chính sách hủy/thông tin người bán (BR-115 không hồi tố) | Bearer (SUPER_ADMIN) |
+| GET | `/api/admin/config/audit-logs` | UC-23: nhật ký thao tác quản trị + lịch sử đăng nhập, chỉ đọc (`?action=&from=&to=`) | Bearer (SUPER_ADMIN) |
 | GET | `/api/catalog/home` | UC-01: nổi bật + khu vực + khuyến mại | Không |
 | GET | `/api/catalog/categories` | UC-01: cây danh mục (`?type=HOMESTAY\|TOUR`) | Không |
 | GET | `/api/catalog/products` | UC-01/02: danh sách sản phẩm | Không |
@@ -241,26 +345,29 @@ Khởi động lại cả 2 server. Nút **"Đăng nhập bằng Google"** sẽ 
 
 ```
 tmdtn02/
-├── backend/                # Express + Prisma (MySQL)
+├── backend/                    # Express + Prisma (MySQL)
 │   ├── prisma/
-│   │   ├── schema.prisma   # Mô hình dữ liệu
-│   │   ├── migrations/     # Lịch sử migration
-│   │   └── seed.js         # Dữ liệu mẫu
+│   │   ├── schema.prisma       # Mô hình dữ liệu (Customer + Admin tách biệt hoàn toàn — BR-67)
+│   │   ├── migrations/         # Lịch sử migration
+│   │   └── seed.js             # Dữ liệu mẫu + tài khoản admin mặc định
 │   └── src/
-│       ├── index.js        # Điểm khởi động server
-│       ├── app.js          # Cấu hình Express + routes
-│       ├── controllers/    # Xử lý nghiệp vụ (auth, catalog, info)
-│       ├── routes/         # Định nghĩa endpoint
-│       ├── middleware/      # Xác thực JWT, xử lý lỗi
-│       └── lib/            # prisma, mailer, google, verification
+│       ├── index.js            # Điểm khởi động server
+│       ├── app.js              # Cấu hình Express + đăng ký toàn bộ routes
+│       ├── controllers/        # Nghiệp vụ Customer (auth, catalog, bookings, payments, discounts, orders, reviews, info...)
+│       │   └── admin/          # Nghiệp vụ khu vực quản trị (Nhóm D, UC-16→23)
+│       ├── routes/              # Định nghĩa endpoint phía Customer
+│       │   └── admin/          # Định nghĩa endpoint khu vực quản trị (/api/admin/*)
+│       ├── middleware/         # Xác thực JWT (Customer + Admin riêng), xử lý lỗi
+│       └── lib/                # prisma, mailer, google, vnpay, config (UC-23), auditLog, uploads...
 │
-└── frontend/               # React + Vite + TS + Tailwind
+└── frontend/                   # React + Vite + TS + Tailwind
     └── src/
-        ├── main.tsx        # Điểm khởi động React
-        ├── App.tsx         # Định tuyến (React Router)
-        ├── components/     # Layout, thẻ sản phẩm, nút Google...
-        ├── pages/          # Trang chủ, tìm kiếm, chi tiết, hồ sơ...
-        └── lib/            # api client, auth context
+        ├── main.tsx             # Điểm khởi động React
+        ├── App.tsx               # Định tuyến (2 cây route: website chính + /admin/*)
+        ├── components/          # Layout, AdminLayout, thẻ sản phẩm, nút Google...
+        ├── pages/                # Trang chủ, tìm kiếm, chi tiết, đặt chỗ, hồ sơ...
+        │   └── admin/           # Các trang khu vực quản trị (Nhóm D, UC-16→23)
+        └── lib/                 # api.ts (Customer) + adminApi.ts (Admin) — tách biệt hoàn toàn
 ```
 
 ---
