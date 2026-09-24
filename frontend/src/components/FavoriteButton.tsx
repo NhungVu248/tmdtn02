@@ -31,9 +31,9 @@ export function FavoriteButton({ productId, className = '' }: { productId: numbe
       onClick={onClick}
       aria-label={active ? 'Bỏ yêu thích' : 'Thêm vào yêu thích'}
       title={active ? 'Bỏ yêu thích' : 'Thêm vào yêu thích'}
-      className={`flex h-8 w-8 items-center justify-center rounded-full bg-white/90 shadow transition hover:bg-white ${className}`}
+      className={`flex h-9 w-9 items-center justify-center rounded-full bg-cream-50/90 shadow-sm backdrop-blur transition hover:bg-cream-50 ${className}`}
     >
-      <span className={active ? 'text-red-500' : 'text-slate-400'}>{active ? '♥' : '♡'}</span>
+      <span className={active ? 'text-clay-500' : 'text-forest-400'}>{active ? '♥' : '♡'}</span>
     </button>
   )
 }

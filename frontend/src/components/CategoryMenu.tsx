@@ -9,13 +9,13 @@ function CategoryNode({ node, depth = 0 }: { node: Category; depth?: number }) {
     <div className="group/item relative">
       <Link
         to={`/category/${node.slug}`}
-        className="flex items-center justify-between gap-4 rounded-md px-3 py-2 text-sm text-slate-700 hover:bg-emerald-50 hover:text-emerald-700"
+        className="flex items-center justify-between gap-4 rounded-md px-3 py-2 text-sm text-forest-700 hover:bg-forest-50 hover:text-forest-900"
       >
         {node.name}
-        {hasChildren && <span className="text-slate-400">›</span>}
+        {hasChildren && <span className="text-forest-300">›</span>}
       </Link>
       {hasChildren && (
-        <div className="invisible absolute left-full top-0 z-20 ml-1 w-56 rounded-lg border border-slate-200 bg-white p-1 opacity-0 shadow-lg transition group-hover/item:visible group-hover/item:opacity-100">
+        <div className="invisible absolute left-full top-0 z-20 ml-1 w-56 rounded-xl border border-cream-200 bg-cream-50 p-1 opacity-0 shadow-lg transition group-hover/item:visible group-hover/item:opacity-100">
           {node.children.map((c) => (
             <CategoryNode key={c.id} node={c} depth={depth + 1} />
           ))}
@@ -34,12 +34,12 @@ function Dropdown({ label, type, to }: { label: string; type: ProductType; to: s
 
   return (
     <div className="group relative">
-      <Link to={to} className="block px-3 py-2 text-sm font-medium text-slate-700 hover:text-emerald-700">
+      <Link to={to} className="block px-3 py-2 text-sm font-medium text-forest-700 hover:text-forest-900">
         {label} ▾
       </Link>
-      <div className="invisible absolute left-0 top-full z-20 w-56 rounded-lg border border-slate-200 bg-white p-1 opacity-0 shadow-lg transition group-hover:visible group-hover:opacity-100">
+      <div className="invisible absolute left-0 top-full z-20 w-56 rounded-xl border border-cream-200 bg-cream-50 p-1 opacity-0 shadow-lg transition group-hover:visible group-hover:opacity-100">
         {roots.length === 0 ? (
-          <p className="px-3 py-2 text-sm text-slate-400">Chưa có danh mục</p>
+          <p className="px-3 py-2 text-sm text-forest-300">Chưa có danh mục</p>
         ) : (
           roots.map((c) => <CategoryNode key={c.id} node={c} />)
         )}

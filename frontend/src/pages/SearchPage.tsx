@@ -91,29 +91,29 @@ export function SearchPage() {
 
   return (
     <div>
-      <section className="border-b border-slate-200 bg-white">
-        <div className="mx-auto max-w-6xl px-4 py-5">
+      <section className="border-b border-cream-200 bg-white">
+        <div className="mx-auto max-w-7xl px-6 py-5">
           <DualSearchBar compact />
         </div>
       </section>
 
-      <div className="mx-auto max-w-6xl gap-6 px-4 py-6 lg:flex">
+      <div className="mx-auto max-w-7xl gap-8 px-6 py-8 lg:flex">
         {/* Cột bộ lọc */}
-        <aside className="mb-6 w-full shrink-0 lg:mb-0 lg:w-64">
-          <div className="rounded-xl border border-slate-200 bg-white p-4">
+        <aside className="mb-6 w-full shrink-0 lg:mb-0 lg:w-72 lg:sticky lg:top-24 lg:self-start">
+          <div className="rounded-2xl border border-cream-200 bg-white p-5">
             <div className="mb-4 flex items-center justify-between">
-              <h2 className="font-semibold">Bộ lọc</h2>
+              <h2 className="font-display text-lg font-semibold text-forest-900">Bộ lọc</h2>
               <button
                 onClick={() => setFilters(emptyFilters)}
-                className="text-xs text-slate-500 hover:text-emerald-700"
+                className="text-xs text-clay-500 hover:text-clay-600"
               >
                 Xóa lọc
               </button>
             </div>
 
             {/* Giá */}
-            <div className="mb-4">
-              <p className="mb-2 text-sm font-medium">Khoảng giá (₫)</p>
+            <div className="mb-5">
+              <p className="mb-2 text-sm font-semibold uppercase tracking-wide text-forest-500">Khoảng giá (₫)</p>
               <div className="flex items-center gap-2">
                 <input
                   type="number"
@@ -121,23 +121,23 @@ export function SearchPage() {
                   placeholder={facets ? String(facets.priceMin) : 'Từ'}
                   value={filters.minPrice}
                   onChange={(e) => setFilters((f) => ({ ...f, minPrice: e.target.value }))}
-                  className="w-full rounded-lg border border-slate-300 px-2 py-1 text-sm"
+                  className="w-full rounded-lg border border-cream-300 px-2 py-1.5 text-sm focus:border-forest-400 focus:outline-none"
                 />
-                <span className="text-slate-400">–</span>
+                <span className="text-forest-300">–</span>
                 <input
                   type="number"
                   min={0}
                   placeholder={facets ? String(facets.priceMax) : 'Đến'}
                   value={filters.maxPrice}
                   onChange={(e) => setFilters((f) => ({ ...f, maxPrice: e.target.value }))}
-                  className="w-full rounded-lg border border-slate-300 px-2 py-1 text-sm"
+                  className="w-full rounded-lg border border-cream-300 px-2 py-1.5 text-sm focus:border-forest-400 focus:outline-none"
                 />
               </div>
             </div>
 
             {/* Đánh giá */}
-            <div className="mb-4">
-              <p className="mb-2 text-sm font-medium">Đánh giá</p>
+            <div className="mb-5">
+              <p className="mb-2 text-sm font-semibold uppercase tracking-wide text-forest-500">Đánh giá</p>
               {['4.5', '4', '0'].map((r) => (
                 <label key={r} className="flex cursor-pointer items-center gap-2 py-0.5 text-sm">
                   <input
@@ -153,8 +153,8 @@ export function SearchPage() {
 
             {/* Khu vực */}
             {facets && facets.locations.length > 0 && (
-              <div className="mb-4">
-                <p className="mb-2 text-sm font-medium">Khu vực</p>
+              <div className="mb-5">
+                <p className="mb-2 text-sm font-semibold uppercase tracking-wide text-forest-500">Khu vực</p>
                 {facets.locations.map((loc) => (
                   <label key={loc} className="flex cursor-pointer items-center gap-2 py-0.5 text-sm">
                     <input
@@ -170,8 +170,8 @@ export function SearchPage() {
 
             {/* Tiện nghi (homestay) */}
             {type === 'HOMESTAY' && facets && facets.amenities.length > 0 && (
-              <div className="mb-4">
-                <p className="mb-2 text-sm font-medium">Tiện nghi</p>
+              <div className="mb-5">
+                <p className="mb-2 text-sm font-semibold uppercase tracking-wide text-forest-500">Tiện nghi</p>
                 {facets.amenities.map((a) => (
                   <label key={a} className="flex cursor-pointer items-center gap-2 py-0.5 text-sm">
                     <input
@@ -188,7 +188,7 @@ export function SearchPage() {
             {/* Thời lượng (tour) */}
             {type === 'TOUR' && facets && facets.durations.length > 0 && (
               <div className="mb-1">
-                <p className="mb-2 text-sm font-medium">Thời lượng</p>
+                <p className="mb-2 text-sm font-semibold uppercase tracking-wide text-forest-500">Thời lượng</p>
                 {facets.durations.map((d) => (
                   <label key={d} className="flex cursor-pointer items-center gap-2 py-0.5 text-sm">
                     <input
@@ -206,11 +206,11 @@ export function SearchPage() {
 
         {/* Cột kết quả */}
         <div className="flex-1">
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-            <h1 className="text-lg font-semibold">
+          <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-cream-200 bg-white px-5 py-3">
+            <h1 className="font-display text-xl font-semibold text-forest-900">
               Tìm kiếm {summary}
               {status === 'ok' && !invalid && (
-                <span className="ml-2 text-sm font-normal text-slate-500">
+                <span className="ml-2 text-sm font-normal text-forest-400">
                   ({data?.count ?? 0} kết quả
                   {data?.nights ? `, ${data.nights} đêm` : ''})
                 </span>
@@ -219,7 +219,7 @@ export function SearchPage() {
             <select
               value={filters.sort}
               onChange={(e) => setFilters((f) => ({ ...f, sort: e.target.value }))}
-              className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm"
+              className="rounded-full border border-cream-300 px-4 py-1.5 text-sm text-forest-700 focus:border-forest-400 focus:outline-none"
             >
               <option value="">Sắp xếp: Mới nhất</option>
               <option value="price_asc">Giá tăng dần</option>
@@ -230,7 +230,7 @@ export function SearchPage() {
 
           {/* Ngoại lệ 2a: tiêu chí không hợp lệ */}
           {invalid && (
-            <div className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+            <div className="rounded-xl border border-clay-400 bg-clay-400/10 px-4 py-3 text-sm text-clay-600">
               ⚠️ {invalid}. Vui lòng chỉnh lại tiêu chí tìm kiếm.
             </div>
           )}
@@ -240,22 +240,22 @@ export function SearchPage() {
 
           {/* Ngoại lệ 3a: không có kết quả */}
           {!invalid && status === 'ok' && data && data.count === 0 && (
-            <div className="flex flex-col items-center justify-center py-16 text-center text-slate-500">
+            <div className="flex flex-col items-center justify-center py-16 text-center text-forest-400">
               <div className="text-4xl">🔍</div>
-              <p className="mt-3 font-medium text-slate-700">Không tìm thấy sản phẩm phù hợp</p>
+              <p className="mt-3 font-display text-lg font-medium text-forest-700">Không tìm thấy sản phẩm phù hợp</p>
               <p className="mt-1 text-sm">Hãy thử nới lỏng tiêu chí: mở rộng khoảng giá, bỏ bớt bộ lọc hoặc đổi khu vực.</p>
             </div>
           )}
 
           {!invalid && status === 'ok' && data && data.count > 0 && (
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">
               {data.items.map((p) => (
                 <div key={p.id}>
                   <ProductCard product={p} />
                   {p.totalPrice != null && (
-                    <p className="mt-1 px-1 text-xs text-slate-500">
+                    <p className="mt-1 px-1 text-xs text-forest-400">
                       Tạm tính {p.nights} đêm:{' '}
-                      <span className="font-semibold text-emerald-700">{formatPrice(p.totalPrice)}</span>
+                      <span className="font-semibold text-clay-600">{formatPrice(p.totalPrice)}</span>
                     </p>
                   )}
                 </div>
