@@ -367,6 +367,44 @@ export const adminApi = {
     if (params.to) qs.set('to', params.to)
     return get<{ items: AdminAuditLogEntry[]; loginAttempts: AdminLoginAttemptEntry[] }>(`/api/admin/config/audit-logs?${qs.toString()}`)
   },
+
+  // Quản lý chương trình khuyến mại (banner trang chủ)
+  listPromotions: (params: { status?: string } = {}) => {
+    const qs = new URLSearchParams()
+    if (params.status) qs.set('status', params.status)
+    return get<{ items: AdminPromotion[] }>(`/api/admin/promotions?${qs.toString()}`)
+  },
+  getPromotion: (id: number) => get<{ item: AdminPromotion }>(`/api/admin/promotions/${id}`),
+  createPromotion: (data: { title: string; description?: string; image?: string; active?: boolean }) =>
+    post<{ item: AdminPromotion }>('/api/admin/promotions', data),
+  updatePromotion: (id: number, data: { title: string; description?: string; image?: string; active?: boolean }) =>
+    putReq<{ item: AdminPromotion }>(`/api/admin/promotions/${id}`, data),
+  setPromotionActive: (id: number, active: boolean) =>
+    patchReq<{ item: AdminPromotion }>(`/api/admin/promotions/${id}/active`, { active }),
+  deletePromotion: (id: number) => del<{ ok: boolean }>(`/api/admin/promotions/${id}`),
+  uploadPromotionImage: async (file: File) => {
+    const form = new FormData()
+    form.append('file', file)
+    const res = await fetch(`${API_URL}/api/admin/promotions/uploads/image`, {
+      method: 'POST',
+      headers: adminToken ? { Authorization: `Bearer ${adminToken}` } : undefined,
+      body: form,
+    })
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}))
+      throw new AdminApiError(res.status, body.message || 'Tải ảnh thất bại')
+    }
+    return res.json() as Promise<{ filename: string; url: string }>
+  },
+}
+
+export interface AdminPromotion {
+  id: number
+  title: string
+  description: string | null
+  image: string | null
+  active: boolean
+  createdAt: string
 }
 
 export interface AdminSystemConfig {

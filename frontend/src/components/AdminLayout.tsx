@@ -20,6 +20,7 @@ const NAV_GROUPS: { title: string; items: { to: string; label: string; icon: str
       { to: '/admin/guides', label: 'Cẩm nang du lịch', icon: '❏' },
       { to: '/admin/orders', label: 'Đơn hàng', icon: '🧾' },
       { to: '/admin/discounts', label: 'Mã khuyến mại', icon: '％' },
+      { to: '/admin/promotions', label: 'Chương trình khuyến mại', icon: '🎁' },
     ],
   },
   {
@@ -40,6 +41,7 @@ const TITLES: { prefix: string; label: string }[] = [
   { prefix: '/admin/guides', label: 'Cẩm nang du lịch' },
   { prefix: '/admin/orders', label: 'Quản lý đơn hàng' },
   { prefix: '/admin/discounts', label: 'Mã khuyến mại' },
+  { prefix: '/admin/promotions', label: 'Chương trình khuyến mại' },
   { prefix: '/admin/reviews', label: 'Kiểm duyệt đánh giá' },
   { prefix: '/admin/reports', label: 'Báo cáo & thống kê' },
   { prefix: '/admin/users', label: 'Quản lý người dùng' },

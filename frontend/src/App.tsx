@@ -20,6 +20,7 @@ import { AdminOrdersPage } from './pages/admin/AdminOrdersPage'
 import { AdminOrderDetailPage } from './pages/admin/AdminOrderDetailPage'
 import { AdminUsersPage } from './pages/admin/AdminUsersPage'
 import { AdminDiscountsPage } from './pages/admin/AdminDiscountsPage'
+import { AdminPromotionsPage } from './pages/admin/AdminPromotionsPage'
 import { AdminReviewsPage } from './pages/admin/AdminReviewsPage'
 import { AdminReportsPage } from './pages/admin/AdminReportsPage'
 import { AdminConfigPage } from './pages/admin/AdminConfigPage'
@@ -85,6 +86,8 @@ function App() {
           <Route path="users" element={<AdminUsersPage />} />
           {/* UC-20 – Quản lý mã khuyến mại */}
           <Route path="discounts" element={<AdminDiscountsPage />} />
+          {/* Quản lý chương trình khuyến mại (banner trang chủ) */}
+          <Route path="promotions" element={<AdminPromotionsPage />} />
           {/* UC-21 – Kiểm duyệt đánh giá */}
           <Route path="reviews" element={<AdminReviewsPage />} />
           {/* UC-22 – Báo cáo & thống kê */}
