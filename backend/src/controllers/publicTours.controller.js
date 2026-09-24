@@ -1,5 +1,6 @@
 import { prisma } from '../lib/prisma.js'
 import { tourToCard } from './catalog.controller.js'
+import { releaseExpiredTourHolds } from '../lib/booking.js'
 
 const DAY_MS = 86400000
 function startOfToday() {
@@ -38,6 +39,9 @@ export async function listTours(req, res, next) {
 export async function getTourDetail(req, res, next) {
   try {
     const { slug } = req.params
+    // Nhả chỗ giữ tạm đã quá hạn (đơn chưa cọc) trước khi đọc, để số chỗ hiển thị luôn chính xác.
+    const found = await prisma.tour.findUnique({ where: { slug }, select: { id: true } })
+    if (found) await releaseExpiredTourHolds(found.id)
     const tour = await prisma.tour.findUnique({
       where: { slug },
       include: {
@@ -110,6 +114,8 @@ export async function checkTourAvailability(req, res, next) {
     if (!tour || tour.status !== 'VISIBLE') {
       return res.status(404).json({ message: 'Tour không còn khả dụng' })
     }
+    // Nhả chỗ giữ tạm đã quá hạn trước khi tính số chỗ còn lại.
+    await releaseExpiredTourHolds(tour.id)
 
     let departure
     if (departureId) {

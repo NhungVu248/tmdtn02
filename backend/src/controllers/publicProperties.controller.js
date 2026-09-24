@@ -1,5 +1,6 @@
 import { prisma } from '../lib/prisma.js'
 import { propertyToCard } from './catalog.controller.js'
+import { releaseExpiredHomestayHolds } from '../lib/booking.js'
 
 const DAY_MS = 86400000
 function parseUtcDate(str) {
@@ -35,6 +36,9 @@ export async function listProperties(req, res, next) {
 export async function getPropertyDetail(req, res, next) {
   try {
     const { slug } = req.params
+    // Nhả phòng giữ tạm đã quá hạn (đơn chưa cọc) để tồn phòng hiển thị chính xác.
+    const found = await prisma.property.findUnique({ where: { slug }, select: { id: true } })
+    if (found) await releaseExpiredHomestayHolds(found.id)
     const property = await prisma.property.findUnique({
       where: { slug },
       include: {
@@ -91,6 +95,8 @@ export async function checkPropertyAvailability(req, res, next) {
     if (!property || property.status !== 'VISIBLE') {
       return res.status(404).json({ message: 'Chỗ nghỉ không còn khả dụng' })
     }
+    // Nhả phòng giữ tạm đã quá hạn trước khi tính số phòng còn trống.
+    await releaseExpiredHomestayHolds(property.id)
     if (!from || !to) return res.status(400).json({ message: 'Vui lòng chọn ngày nhận và trả phòng' })
     const nights = nightsBetween(from, to)
     if (!nights) return res.status(400).json({ message: 'Ngày không hợp lệ' })
