@@ -1,9 +1,16 @@
 import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { Loading } from '../components/StateBlocks'
+import { STATUS_LABEL } from '../components/OrderDetailCard'
 import { api, formatPrice } from '../lib/api'
 
-// UC-11 – Trang kết quả sau khi VNPAY chuyển hướng về (?code=&status=success|failed|invalid).
+const PAYMENT_LABEL: Record<string, string> = {
+  VNPAY: 'VNPAY',
+  COD: 'Thanh toán khi nhận',
+  CASH: 'Tiền mặt',
+}
+
+// Trang kết quả sau khi VNPAY chuyển hướng về (?code=&status=success|failed|invalid).
 export function PaymentResultPage() {
   const [params] = useSearchParams()
   const code = params.get('code') || ''
@@ -28,44 +35,97 @@ export function PaymentResultPage() {
   const ok = statusParam === 'success'
   const invalid = statusParam === 'invalid'
 
-  return (
-    <div className="mx-auto max-w-lg px-4 py-16 text-center">
-      <div className="text-4xl">{ok ? '✅' : '❌'}</div>
-      <h1 className="mt-3 text-2xl font-bold">
-        {ok ? 'Đặt cọc thành công' : invalid ? 'Chữ ký không hợp lệ' : 'Thanh toán không thành công'}
-      </h1>
-      <p className="mt-1 text-slate-500">
-        {ok
-          ? 'Đơn của bạn đã được xác nhận.'
-          : invalid
-            ? 'Kết quả trả về không xác thực được (nghi ngờ giả mạo). Giao dịch bị từ chối.'
-            : 'Giao dịch bị hủy hoặc thất bại. Bạn có thể thử lại trong thời hạn giữ chỗ.'}
-      </p>
+  const title = ok ? 'Đặt cọc thành công' : invalid ? 'Chữ ký không hợp lệ' : 'Thanh toán không thành công'
+  const desc = ok
+    ? 'Đơn của bạn đã được xác nhận. Cảm ơn bạn đã đặt chỗ cùng StayTour!'
+    : invalid
+      ? 'Kết quả trả về không xác thực được (nghi ngờ giả mạo). Giao dịch đã bị từ chối.'
+      : 'Giao dịch bị hủy hoặc thất bại. Bạn có thể thử lại trong thời hạn giữ chỗ.'
 
+  return (
+    <div className="mx-auto max-w-xl px-6 py-16">
+      {/* Hero trạng thái */}
+      <div className="text-center">
+        <div
+          className={`mx-auto grid h-20 w-20 place-items-center rounded-full text-4xl ${
+            ok ? 'bg-forest-100 text-forest-700' : 'bg-red-100 text-red-600'
+          }`}
+        >
+          {ok ? '✓' : '✕'}
+        </div>
+        <h1 className="mt-5 font-display text-4xl font-semibold text-forest-900">{title}</h1>
+        <p className="mx-auto mt-2 max-w-md text-forest-400">{desc}</p>
+      </div>
+
+      {/* Thẻ tóm tắt đơn */}
       {info && (
-        <div className="mt-6 rounded-xl border border-slate-200 bg-white p-5 text-left text-sm">
-          <div className="flex items-center justify-between">
-            <span className="text-slate-500">Mã đơn</span>
-            <span className="font-mono font-bold text-emerald-700">{info.code}</span>
+        <div className="mt-8 overflow-hidden rounded-3xl border border-cream-200 bg-white">
+          <div className="flex items-center justify-between bg-forest-50 px-5 py-4">
+            <div>
+              <p className="text-xs uppercase tracking-wide text-forest-400">Mã đơn</p>
+              <p className="font-mono text-lg font-bold text-forest-700">{info.code}</p>
+            </div>
+            <span
+              className={`rounded-full px-3 py-1 text-xs font-medium ${
+                ok ? 'bg-forest-100 text-forest-700' : 'bg-red-100 text-red-600'
+              }`}
+            >
+              {STATUS_LABEL[info.status] ?? info.status}
+            </span>
           </div>
-          <div className="mt-1 flex items-center justify-between">
-            <span className="text-slate-500">Sản phẩm</span>
-            <span>{info.productName}</span>
-          </div>
-          <div className="mt-1 flex items-center justify-between">
-            <span className="text-slate-500">Đặt cọc</span>
-            <span className="font-semibold">{formatPrice(info.depositAmount)}</span>
-          </div>
-          <div className="mt-1 flex items-center justify-between">
-            <span className="text-slate-500">Trạng thái</span>
-            <span>{info.status}</span>
+
+          <div className="p-5">
+            <p className="font-display text-lg font-semibold text-forest-900">{info.productName}</p>
+
+            <div className="mt-4 space-y-2 border-t border-cream-100 pt-4 text-sm">
+              {info.paymentMethod && (
+                <Row label="Phương thức" value={PAYMENT_LABEL[info.paymentMethod] ?? info.paymentMethod} />
+              )}
+              <Row label="Tổng tiền" value={formatPrice(info.totalPrice)} />
+              <Row label="Còn lại (trả sau)" value={formatPrice(info.remainingAmount)} />
+            </div>
+
+            <div className="mt-4 flex items-center justify-between rounded-2xl bg-forest-700 px-5 py-4 text-cream-50">
+              <span className="text-sm">{ok ? 'Đã đặt cọc' : 'Số tiền cọc'}</span>
+              <span className="font-display text-2xl font-bold">{formatPrice(info.depositAmount)}</span>
+            </div>
           </div>
         </div>
       )}
 
-      <Link to="/" className="mt-6 inline-block rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700">
-        Về trang chủ
-      </Link>
+      {/* Điều hướng */}
+      <div className="mt-7 flex flex-col gap-3 sm:flex-row">
+        {ok ? (
+          <>
+            <Link to="/orders" className="flex-1 rounded-full bg-forest-700 px-5 py-3 text-center text-sm font-semibold text-cream-50 hover:bg-forest-800">
+              Xem đơn của tôi
+            </Link>
+            <Link to="/" className="flex-1 rounded-full border border-forest-300 px-5 py-3 text-center text-sm font-semibold text-forest-700 hover:bg-forest-50">
+              Về trang chủ
+            </Link>
+          </>
+        ) : (
+          <>
+            {code && (
+              <Link to={`/orders/${code}`} className="flex-1 rounded-full bg-forest-700 px-5 py-3 text-center text-sm font-semibold text-cream-50 hover:bg-forest-800">
+                Thử đặt cọc lại
+              </Link>
+            )}
+            <Link to="/" className="flex-1 rounded-full border border-forest-300 px-5 py-3 text-center text-sm font-semibold text-forest-700 hover:bg-forest-50">
+              Về trang chủ
+            </Link>
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function Row({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between">
+      <span className="text-forest-400">{label}</span>
+      <span className="font-medium text-forest-800">{value}</span>
     </div>
   )
 }
