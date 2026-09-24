@@ -1,1 +1,60 @@
+/* ── Font chữ (phong cách Wanderly: tiêu đề serif thanh lịch + thân bài sans) ── */
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap');
 @import "tailwindcss";
+
+/*
+  Bảng màu lấy cảm hứng từ "Wanderly — The Art of Travel Planning":
+  xanh rêu/forest trầm ấm làm chủ đạo, nền kem/cream nhẹ nhàng,
+  điểm nhấn terracotta ấm và vàng cho đánh giá.
+  Đăng ký token qua @theme (Tailwind v4) để dùng như utility: bg-forest-700, text-cream-50...
+*/
+@theme {
+  /* Forest — màu thương hiệu chính */
+  --color-forest-50: #eef3ef;
+  --color-forest-100: #d6e2d9;
+  --color-forest-200: #adc5b3;
+  --color-forest-300: #7fa389;
+  --color-forest-400: #557d63;
+  --color-forest-500: #3d6249;
+  --color-forest-600: #2f4d3a;
+  --color-forest-700: #26402f;
+  --color-forest-800: #1d3225;
+  --color-forest-900: #14231a;
+
+  /* Cream / sand — nền & bề mặt */
+  --color-cream-50: #faf7f0;
+  --color-cream-100: #f4efe4;
+  --color-cream-200: #eae2d1;
+  --color-cream-300: #ddd1b9;
+  --color-cream-400: #c9b894;
+
+  /* Clay / terracotta — điểm nhấn ấm */
+  --color-clay-400: #d08a63;
+  --color-clay-500: #c0714a;
+  --color-clay-600: #a85c39;
+
+  /* Vàng ánh — đánh giá sao */
+  --color-gold-400: #e0a94a;
+  --color-gold-500: #cf9631;
+
+  --font-serif: 'Fraunces', ui-serif, Georgia, serif;
+  --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+}
+
+@layer base {
+  body {
+    background-color: var(--color-cream-50);
+    color: var(--color-forest-900);
+    font-family: var(--font-sans);
+  }
+  h1, h2, h3, h4 {
+    font-family: var(--font-serif);
+  }
+}
+
+/* Tiện ích nhỏ dùng lại */
+@layer components {
+  .font-display {
+    font-family: var(--font-serif);
+  }
+}

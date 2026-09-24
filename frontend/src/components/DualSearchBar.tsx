@@ -28,18 +28,21 @@ export function DualSearchBar({ compact = false }: { compact?: boolean }) {
     navigate(`/search?${qs.toString()}`)
   }
 
-  const field = 'rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none'
+  const input =
+    'w-full bg-transparent text-sm text-forest-900 placeholder:text-forest-300 focus:outline-none'
+  const label = 'text-[11px] font-medium uppercase tracking-wide text-forest-400'
 
   return (
-    <div className={compact ? '' : 'rounded-2xl bg-white p-4 shadow-lg'}>
-      <div className="mb-3 inline-flex rounded-lg bg-slate-100 p-1">
+    <div className={compact ? '' : 'rounded-3xl bg-white p-3 shadow-2xl shadow-forest-900/15 ring-1 ring-cream-200'}>
+      {/* Tab chuyển Homestay / Tour */}
+      <div className="mb-3 inline-flex rounded-full bg-cream-100 p-1">
         {(['HOMESTAY', 'TOUR'] as const).map((t) => (
           <button
             key={t}
             type="button"
             onClick={() => setTab(t)}
-            className={`rounded-md px-4 py-1.5 text-sm font-medium transition ${
-              tab === t ? 'bg-white text-emerald-700 shadow' : 'text-slate-500'
+            className={`rounded-full px-5 py-1.5 text-sm font-medium transition ${
+              tab === t ? 'bg-forest-700 text-cream-50 shadow' : 'text-forest-500 hover:text-forest-700'
             }`}
           >
             {t === 'HOMESTAY' ? 'Homestay' : 'Tour'}
@@ -47,51 +50,51 @@ export function DualSearchBar({ compact = false }: { compact?: boolean }) {
         ))}
       </div>
 
-      <form onSubmit={submit} className="flex flex-wrap items-end gap-3">
-        <label className="flex flex-col gap-1">
-          <span className="text-xs text-slate-500">Điểm đến</span>
+      <form onSubmit={submit} className="flex flex-col gap-2 md:flex-row md:items-stretch md:gap-0">
+        <div className="flex flex-1 flex-col justify-center px-4 py-2 md:border-r md:border-cream-200">
+          <span className={label}>◍ Điểm đến</span>
           <input
-            className={`${field} w-48`}
+            className={input}
             placeholder="Đà Lạt, Sa Pa..."
             value={destination}
             onChange={(e) => setDestination(e.target.value)}
           />
-        </label>
+        </div>
 
         {tab === 'HOMESTAY' ? (
           <>
-            <label className="flex flex-col gap-1">
-              <span className="text-xs text-slate-500">Nhận phòng</span>
-              <input type="date" className={field} value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
-            </label>
-            <label className="flex flex-col gap-1">
-              <span className="text-xs text-slate-500">Trả phòng</span>
-              <input type="date" className={field} value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
-            </label>
+            <div className="flex flex-1 flex-col justify-center px-4 py-2 md:border-r md:border-cream-200">
+              <span className={label}>▤ Nhận phòng</span>
+              <input type="date" className={input} value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
+            </div>
+            <div className="flex flex-1 flex-col justify-center px-4 py-2 md:border-r md:border-cream-200">
+              <span className={label}>▤ Trả phòng</span>
+              <input type="date" className={input} value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+            </div>
           </>
         ) : (
-          <label className="flex flex-col gap-1">
-            <span className="text-xs text-slate-500">Ngày khởi hành</span>
-            <input type="date" className={field} value={departDate} onChange={(e) => setDepartDate(e.target.value)} />
-          </label>
+          <div className="flex flex-1 flex-col justify-center px-4 py-2 md:border-r md:border-cream-200">
+            <span className={label}>▤ Ngày khởi hành</span>
+            <input type="date" className={input} value={departDate} onChange={(e) => setDepartDate(e.target.value)} />
+          </div>
         )}
 
-        <label className="flex flex-col gap-1">
-          <span className="text-xs text-slate-500">Số khách</span>
+        <div className="flex w-full flex-col justify-center px-4 py-2 md:w-32 md:border-r md:border-cream-200">
+          <span className={label}>☺ Số khách</span>
           <input
             type="number"
             min={1}
-            className={`${field} w-20`}
+            className={input}
             value={guests}
             onChange={(e) => setGuests(Math.max(1, Number(e.target.value)))}
           />
-        </label>
+        </div>
 
         <button
           type="submit"
-          className="rounded-lg bg-emerald-600 px-5 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
+          className="mt-1 flex items-center justify-center gap-2 rounded-2xl bg-clay-500 px-7 py-3 text-sm font-semibold text-white shadow-lg transition hover:bg-clay-600 md:mt-0"
         >
-          Tìm kiếm
+          Tìm kiếm →
         </button>
       </form>
     </div>
