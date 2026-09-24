@@ -182,7 +182,7 @@ export function OrderDetailPage() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl px-4 py-8">
+    <div className="mx-auto max-w-3xl px-4 py-8">
       <nav className="mb-4 text-sm text-forest-400">
         <Link to="/orders" className="hover:text-forest-700">Đơn của tôi</Link> / <span className="text-forest-700">{order.code}</span>
       </nav>
