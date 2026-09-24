@@ -38,6 +38,9 @@ export function BookingPage() {
   const [email, setEmail] = useState('')
   const [phone, setPhone] = useState('')
   const [note, setNote] = useState('')
+  const [requests, setRequests] = useState<string[]>([]) // yêu cầu đặc biệt chọn nhanh
+  const [arrivalTime, setArrivalTime] = useState('') // giờ nhận phòng dự kiến (homestay)
+  const [bookingFor, setBookingFor] = useState<'self' | 'other'>('self') // đặt cho ai
   const [terms, setTerms] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -186,6 +189,16 @@ export function BookingPage() {
     }
   }
 
+  // Gộp yêu cầu chọn nhanh + giờ đến + ghi chú tự do + "đặt cho người khác" thành một chuỗi note.
+  function composedNote() {
+    const parts: string[] = []
+    if (bookingFor === 'other') parts.push('Đặt cho người khác')
+    if (requests.length) parts.push(`Yêu cầu: ${requests.join(', ')}`)
+    if (arrivalTime) parts.push(`Giờ nhận phòng dự kiến: ${arrivalTime}`)
+    if (note.trim()) parts.push(note.trim())
+    return parts.join(' | ')
+  }
+
   async function submit(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
@@ -205,7 +218,7 @@ export function BookingPage() {
         guestPhone: phone,
         acceptedTerms: terms,
         discountCode: applied?.code,
-        note: note.trim() || undefined,
+        note: composedNote() || undefined,
       }
       const r = isTour
         ? await api.createTourBooking({ slug: slug!, date, guests, children, ...contact })
@@ -451,6 +464,9 @@ export function BookingPage() {
   const field =
     'w-full rounded-xl border border-cream-300 bg-white px-3.5 py-2.5 text-sm text-forest-900 placeholder:text-forest-300 focus:border-forest-400 focus:outline-none focus:ring-2 focus:ring-forest-100'
   const lbl = 'mb-1.5 block text-sm font-medium text-forest-700'
+  const quickRequests = isTour
+    ? ['Suất ăn chay', 'Đón/tiễn sân bay', 'Ghép nhóm', 'Hỗ trợ người cao tuổi']
+    : ['Phòng không hút thuốc', 'Nhận phòng sớm', 'Trả phòng muộn', 'Thêm giường phụ', 'Phòng yên tĩnh / tầng cao', 'Trang trí dịp đặc biệt']
 
   return (
     <div className="mx-auto max-w-5xl px-6 py-10">
@@ -465,12 +481,23 @@ export function BookingPage() {
       <div className="gap-8 lg:flex lg:items-start">
         <form onSubmit={submit} className="flex-1 space-y-5">
           {!user && (
-            <div className="rounded-2xl border border-cream-200 bg-cream-100/60 px-4 py-3 text-sm text-forest-600">
-              👤 Bạn đang đặt với tư cách khách.{' '}
-              <Link to={`/login?returnTo=${encodeURIComponent(location.pathname + location.search)}`} className="font-medium text-clay-600 hover:underline">
-                Đăng nhập
-              </Link>{' '}
-              để lưu đơn vào tài khoản &amp; tự điền thông tin.
+            <div className="rounded-2xl border border-cream-200 bg-white p-5">
+              <div className="flex items-start gap-3">
+                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-forest-100 text-lg">👤</span>
+                <div className="text-sm">
+                  <p className="font-display text-base font-semibold text-forest-900">Đặt chỗ với tư cách khách</p>
+                  <p className="mt-0.5 text-forest-500">
+                    Bạn không cần tài khoản. Sau khi đặt, chúng tôi sẽ cấp <span className="font-medium text-forest-700">mã đơn &amp; mã PIN</span> để tra cứu hoặc hủy đơn.
+                  </p>
+                  <p className="mt-2 text-forest-400">
+                    Đã có tài khoản?{' '}
+                    <Link to={`/login?returnTo=${encodeURIComponent(location.pathname + location.search)}`} className="font-medium text-clay-600 hover:underline">
+                      Đăng nhập
+                    </Link>{' '}
+                    để lưu đơn &amp; tự điền thông tin.
+                  </p>
+                </div>
+              </div>
             </div>
           )}
 
@@ -492,14 +519,75 @@ export function BookingPage() {
                 </div>
               </div>
               <div>
-                <label className={lbl}>Ghi chú / yêu cầu đặc biệt <span className="font-normal text-forest-300">(không bắt buộc)</span></label>
-                <textarea
-                  className={`${field} min-h-24`}
-                  placeholder="VD: nhận phòng sớm, thêm giường phụ, đón sân bay..."
-                  value={note}
-                  onChange={(e) => setNote(e.target.value)}
-                />
+                <span className={lbl}>Bạn đặt {isTour ? 'chỗ' : 'phòng'} cho ai?</span>
+                <div className="flex flex-wrap gap-2">
+                  {([['self', 'Tôi là khách chính'], ['other', 'Đặt cho người khác']] as const).map(([v, l]) => (
+                    <button
+                      key={v}
+                      type="button"
+                      onClick={() => setBookingFor(v)}
+                      className={`rounded-full px-4 py-1.5 text-sm font-medium transition ${
+                        bookingFor === v ? 'bg-forest-700 text-cream-50' : 'bg-cream-100 text-forest-600 hover:bg-cream-200'
+                      }`}
+                    >
+                      {l}
+                    </button>
+                  ))}
+                </div>
               </div>
+            </div>
+          </div>
+
+          {/* Yêu cầu đặc biệt (tham khảo Booking/Traveloka) */}
+          <div className="rounded-3xl border border-cream-200 bg-white p-6">
+            <h2 className="font-display text-lg font-semibold text-forest-900">Yêu cầu đặc biệt</h2>
+            <p className="mt-1 text-sm text-forest-400">
+              Chúng tôi sẽ cố gắng đáp ứng — tuỳ tình trạng thực tế, không đảm bảo 100%.
+            </p>
+            <div className="mt-4 grid gap-2 sm:grid-cols-2">
+              {quickRequests.map((r) => {
+                const on = requests.includes(r)
+                return (
+                  <label
+                    key={r}
+                    className={`flex cursor-pointer items-center gap-2.5 rounded-xl border px-3.5 py-2.5 text-sm transition ${
+                      on ? 'border-forest-500 bg-forest-50 text-forest-800' : 'border-cream-300 text-forest-600 hover:border-forest-300'
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      className="accent-forest-700"
+                      checked={on}
+                      onChange={() => setRequests((prev) => (on ? prev.filter((x) => x !== r) : [...prev, r]))}
+                    />
+                    {r}
+                  </label>
+                )
+              })}
+            </div>
+
+            {!isTour && (
+              <div className="mt-4">
+                <label className={lbl}>Giờ nhận phòng dự kiến <span className="font-normal text-forest-300">(không bắt buộc)</span></label>
+                <select className={field} value={arrivalTime} onChange={(e) => setArrivalTime(e.target.value)}>
+                  <option value="">Chưa xác định</option>
+                  <option>Trước 12:00</option>
+                  <option>12:00 – 14:00</option>
+                  <option>14:00 – 16:00</option>
+                  <option>16:00 – 18:00</option>
+                  <option>Sau 18:00</option>
+                </select>
+              </div>
+            )}
+
+            <div className="mt-4">
+              <label className={lbl}>Ghi chú thêm <span className="font-normal text-forest-300">(không bắt buộc)</span></label>
+              <textarea
+                className={`${field} min-h-24`}
+                placeholder="VD: thêm giường phụ, đón sân bay, dị ứng thực phẩm..."
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+              />
             </div>
           </div>
 
