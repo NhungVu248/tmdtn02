@@ -26,7 +26,7 @@ export function AdminGuideFormPage() {
   const [coverImage, setCoverImage] = useState<string | null>(null)
   const [tourIds, setTourIds] = useState<number[]>([])
   const [tours, setTours] = useState<{ id: number; title: string; slug: string }[]>([])
-  const [guideId, setGuideId] = useState<number | null>(null)
+  const [, setGuideId] = useState<number | null>(null)
 
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
