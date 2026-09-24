@@ -7,34 +7,13 @@ const FEATURES = [
   { icon: '⭐', title: 'Đánh giá thật', desc: 'Chỉ khách đã trải nghiệm mới được đánh giá — kèm hình ảnh, kiểm duyệt minh bạch.' },
 ]
 
-// Đội ngũ phát triển (theo bảng phân công nhiệm vụ - Nhóm 09).
+// Đội ngũ phát triển - Nhóm 09.
 const TEAM = [
-  {
-    name: 'Vũ Hồng Nhung',
-    role: 'Nhóm trưởng · Front-end · Back-end',
-    tasks: 'Lập kế hoạch, phân công, theo dõi tiến độ, đầu mối liên hệ giảng viên; lập trình giao diện & hệ thống (code chính); báo cáo.',
-    lead: true,
-  },
-  {
-    name: 'Trần Thiên Đạt',
-    role: 'Phân tích – Thiết kế',
-    tasks: 'Khảo sát nghiệp vụ, đặc tả yêu cầu, thiết kế use case, sitemap, wireframe; báo cáo.',
-  },
-  {
-    name: 'Vũ Thị Hải Yến',
-    role: 'Phân tích – Thiết kế · QA',
-    tasks: 'Hỗ trợ đặc tả, sơ đồ use case, wireframe; thiết kế & thực hiện ca kiểm thử, rà soát bảo mật; báo cáo.',
-  },
-  {
-    name: 'Đào Quỳnh Nga',
-    role: 'Phân tích – Thiết kế',
-    tasks: 'Hỗ trợ sơ đồ use case; xây dựng cấu trúc & khung báo cáo theo yêu cầu giảng viên; báo cáo.',
-  },
-  {
-    name: 'Đoàn Thị Thu Thảo',
-    role: 'Bảo mật – Kiểm thử (QA)',
-    tasks: 'Thiết kế & thực hiện ca kiểm thử, đối chiếu yêu cầu pháp lý; báo cáo.',
-  },
+  { name: 'Vũ Hồng Nhung', role: 'Nhóm trưởng · Front-end · Back-end', lead: true },
+  { name: 'Trần Thiên Đạt', role: 'Phân tích – Thiết kế' },
+  { name: 'Vũ Thị Hải Yến', role: 'Phân tích – Thiết kế · QA' },
+  { name: 'Đào Quỳnh Nga', role: 'Phân tích – Thiết kế' },
+  { name: 'Đoàn Thị Thu Thảo', role: 'Bảo mật – Kiểm thử (QA)' },
 ]
 
 // Trang giới thiệu website StayTour.
@@ -85,39 +64,40 @@ export function AboutPage() {
       </section>
 
       {/* ── Đội ngũ phát triển ── */}
-      <section className="bg-cream-100/60 py-16">
-        <div className="mx-auto max-w-6xl px-6">
-          <div className="mb-10 text-center">
-            <p className="text-sm font-medium uppercase tracking-[0.2em] text-clay-500">Nhóm 09</p>
-            <h2 className="mt-2 font-display text-4xl font-semibold text-forest-900">Đội ngũ phát triển</h2>
-            <p className="mx-auto mt-2 max-w-xl text-forest-400">
+      <section className="relative overflow-hidden py-20">
+        <img
+          src="https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1600&q=75"
+          alt=""
+          className="absolute inset-0 h-full w-full object-cover"
+        />
+        <div className="absolute inset-0 bg-forest-900/85" />
+        <div className="relative mx-auto max-w-6xl px-6">
+          <div className="mb-12 text-center">
+            <p className="text-sm font-medium uppercase tracking-[0.2em] text-cream-300">Nhóm 09</p>
+            <h2 className="mt-2 font-display text-4xl font-semibold text-cream-50">Đội ngũ phát triển</h2>
+            <p className="mx-auto mt-2 max-w-xl text-cream-200">
               Những thành viên đã cùng nhau xây dựng StayTour cho đồ án Thương mại điện tử.
             </p>
           </div>
 
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {TEAM.map((m) => (
               <div
                 key={m.name}
-                className={`rounded-2xl border bg-white p-6 transition hover:shadow-lg hover:shadow-forest-900/5 ${
-                  m.lead ? 'border-clay-400 ring-1 ring-clay-400/30' : 'border-cream-200'
+                className={`flex flex-col items-center rounded-2xl border bg-white/95 p-7 text-center backdrop-blur transition hover:-translate-y-1 hover:shadow-xl ${
+                  m.lead ? 'border-clay-400 ring-2 ring-clay-400/40' : 'border-cream-200'
                 }`}
               >
-                <div className="flex items-center gap-4">
-                  <div className="grid h-14 w-14 shrink-0 place-items-center rounded-full bg-forest-100 font-display text-xl font-semibold text-forest-700">
-                    {m.name.split(' ').pop()?.charAt(0)}
-                  </div>
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <h3 className="font-display text-lg font-semibold text-forest-900">{m.name}</h3>
-                      {m.lead && (
-                        <span className="rounded-full bg-clay-500/15 px-2 py-0.5 text-[11px] font-medium text-clay-600">Trưởng nhóm</span>
-                      )}
-                    </div>
-                    <p className="text-sm font-medium text-forest-500">{m.role}</p>
-                  </div>
+                <div className="grid h-20 w-20 place-items-center rounded-full bg-forest-100 font-display text-3xl font-semibold text-forest-700 ring-4 ring-cream-100">
+                  {m.name.split(' ').pop()?.charAt(0)}
                 </div>
-                <p className="mt-4 border-t border-cream-100 pt-3 text-sm leading-relaxed text-forest-400">{m.tasks}</p>
+                <h3 className="mt-4 font-display text-xl font-semibold text-forest-900">{m.name}</h3>
+                <p className="mt-1 text-sm font-medium text-forest-500">{m.role}</p>
+                {m.lead && (
+                  <span className="mt-3 rounded-full bg-clay-500/15 px-3 py-1 text-xs font-medium text-clay-600">
+                    ★ Trưởng nhóm
+                  </span>
+                )}
               </div>
             ))}
           </div>
