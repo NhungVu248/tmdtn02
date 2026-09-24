@@ -244,79 +244,143 @@ export function BookingPage() {
   // Sau khi tạo đơn: bước thanh toán đặt cọc (UC-11), rồi màn hình hoàn tất.
   if (result) {
     const b = result.booking
+    const steps = ['Chọn dịch vụ', 'Thông tin', 'Đặt cọc', 'Hoàn tất']
+    const currentStep = paid ? 3 : 2
     return (
-      <div className="mx-auto max-w-lg px-4 py-12">
+      <div className="mx-auto max-w-xl px-6 py-12">
+        {/* Thanh tiến trình */}
+        <div className="mb-8 flex items-center">
+          {steps.map((s, i) => {
+            const done = i <= currentStep
+            return (
+              <div key={s} className="flex flex-1 items-center last:flex-none">
+                <div className="flex flex-col items-center">
+                  <span
+                    className={`grid h-8 w-8 place-items-center rounded-full text-xs font-semibold transition ${
+                      done ? 'bg-forest-600 text-cream-50' : 'bg-cream-200 text-forest-400'
+                    }`}
+                  >
+                    {i < currentStep || paid ? '✓' : i + 1}
+                  </span>
+                  <span className={`mt-1.5 text-center text-[11px] ${done ? 'font-medium text-forest-700' : 'text-forest-400'}`}>{s}</span>
+                </div>
+                {i < steps.length - 1 && (
+                  <div className={`mx-1 mb-5 h-0.5 flex-1 ${i < currentStep ? 'bg-forest-600' : 'bg-cream-200'}`} />
+                )}
+              </div>
+            )
+          })}
+        </div>
+
         <div className="text-center">
-          <div className="text-4xl">{paid ? '✅' : '🧾'}</div>
-          <h1 className="mt-3 text-2xl font-bold">{paid ? 'Đặt cọc thành công' : 'Xác nhận & đặt cọc'}</h1>
-          <p className="mt-1 text-slate-500">
-            {paid ? 'Đơn đã được xác nhận. Cảm ơn bạn!' : 'Đơn đang chờ đặt cọc để hoàn tất.'}
+          <div className={`mx-auto grid h-16 w-16 place-items-center rounded-full text-3xl ${paid ? 'bg-forest-100' : 'bg-clay-400/15'}`}>
+            {paid ? '✅' : '🧾'}
+          </div>
+          <h1 className="mt-4 font-display text-3xl font-semibold text-forest-900">
+            {paid ? 'Đặt cọc thành công' : 'Xác nhận & đặt cọc'}
+          </h1>
+          <p className="mt-1 text-forest-400">
+            {paid ? 'Đơn của bạn đã được xác nhận. Cảm ơn bạn đã đặt chỗ!' : 'Đơn đang chờ đặt cọc để hoàn tất.'}
           </p>
         </div>
 
-        <div className="mt-6 rounded-xl border border-slate-200 bg-white p-5">
-          <div className="flex items-center justify-between">
-            <span className="text-slate-500">Mã đơn</span>
-            <span className="font-mono text-lg font-bold text-emerald-700">{b.code}</span>
+        {/* Thẻ tóm tắt đơn */}
+        <div className="mt-7 overflow-hidden rounded-3xl border border-cream-200 bg-white">
+          <div className="flex items-center justify-between bg-forest-50 px-5 py-4">
+            <div>
+              <p className="text-xs uppercase tracking-wide text-forest-400">Mã đơn</p>
+              <p className="font-mono text-lg font-bold text-forest-700">{b.code}</p>
+            </div>
+            <span className="rounded-full bg-clay-500/15 px-3 py-1 text-xs font-medium text-clay-600">
+              {paid ? 'Đã đặt cọc' : 'Chờ đặt cọc'}
+            </span>
           </div>
-          {result.pin && (
-            <>
-              <div className="mt-2 flex items-center justify-between">
-                <span className="text-slate-500">Mã PIN tra cứu</span>
-                <span className="font-mono text-lg font-bold">{result.pin}</span>
+
+          <div className="p-5">
+            {result.pin && (
+              <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-amber-800">Mã PIN tra cứu</span>
+                  <span className="font-mono text-lg font-bold text-amber-900">{result.pin}</span>
+                </div>
+                <p className="mt-1 text-xs text-amber-600">
+                  Lưu lại mã đơn &amp; PIN để tra cứu/hủy đơn sau này (chỉ hiển thị một lần).
+                </p>
               </div>
-              <p className="mt-1 text-xs text-amber-600">
-                Lưu lại mã đơn và PIN để tra cứu/hủy đơn sau này (chỉ hiển thị một lần).
-              </p>
-            </>
-          )}
-          <hr className="my-3 border-slate-100" />
-          <p className="font-medium">{b.productName}</p>
-          <p className="text-sm text-slate-500">
-            {isTour
-              ? `${b.guests} người lớn${b.children ? ` · ${b.children} trẻ em` : ''}`
-              : `${b.nights} đêm · ${b.guests} khách`}
-          </p>
-          <div className="mt-3 space-y-1 text-sm">
-            {!!b.discountAmount && (
-              <Row label={`Mã giảm giá (${b.discountCode})`} value={`-${formatPrice(b.discountAmount)}`} />
             )}
-            <Row label="Tổng tiền" value={formatPrice(b.totalPrice)} />
-            <Row label={paid ? 'Đã đặt cọc' : 'Cần đặt cọc'} value={formatPrice(b.depositAmount)} strong />
-            <Row label="Còn lại (trả sau)" value={formatPrice(b.remainingAmount)} />
+
+            <p className="font-display text-lg font-semibold text-forest-900">{b.productName}</p>
+            <p className="text-sm text-forest-400">
+              {isTour
+                ? `${b.guests} người lớn${b.children ? ` · ${b.children} trẻ em` : ''}`
+                : `${b.nights} đêm · ${b.guests} khách`}
+            </p>
+
+            <div className="mt-4 space-y-2 border-t border-cream-100 pt-4 text-sm">
+              {!!b.discountAmount && (
+                <Row label={`Mã giảm giá (${b.discountCode})`} value={`-${formatPrice(b.discountAmount)}`} />
+              )}
+              <Row label="Tổng tiền" value={formatPrice(b.totalPrice)} />
+              <Row label="Còn lại (trả sau)" value={formatPrice(b.remainingAmount)} />
+            </div>
+
+            {/* Số tiền cọc nổi bật */}
+            <div className="mt-4 flex items-center justify-between rounded-2xl bg-forest-700 px-5 py-4 text-cream-50">
+              <span className="text-sm">{paid ? 'Đã đặt cọc' : 'Số tiền cần đặt cọc'}</span>
+              <span className="font-display text-2xl font-bold">{formatPrice(b.depositAmount)}</span>
+            </div>
           </div>
         </div>
 
         {!paid ? (
-          <div className="mt-5">
-            <h2 className="mb-2 font-semibold">Chọn phương thức thanh toán cọc</h2>
-            {payError && <div className="mb-3 rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700">{payError}</div>}
-            <div className="space-y-2">
+          <div className="mt-6">
+            <h2 className="mb-3 font-display text-lg font-semibold text-forest-900">Chọn phương thức thanh toán cọc</h2>
+            {payError && <div className="mb-3 rounded-xl border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700">{payError}</div>}
+            <div className="space-y-3">
               {vnpayEnabled && (
                 <button
                   onClick={() => pay('VNPAY')}
                   disabled={paying !== null}
-                  className="w-full rounded-lg bg-blue-600 px-4 py-3 font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+                  className="flex w-full items-center gap-4 rounded-2xl border-2 border-forest-600 bg-forest-700 px-5 py-4 text-left text-cream-50 transition hover:bg-forest-800 disabled:opacity-50"
                 >
-                  {paying === 'VNPAY' ? 'Đang chuyển tới VNPAY...' : `Thanh toán VNPAY ${formatPrice(b.depositAmount)}`}
+                  <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-cream-50 text-lg font-bold text-forest-700">₫</span>
+                  <span className="flex-1">
+                    <span className="block font-semibold">
+                      {paying === 'VNPAY' ? 'Đang chuyển tới VNPAY...' : 'Thanh toán qua VNPAY'}
+                    </span>
+                    <span className="block text-xs text-cream-200">Thẻ ATM / QR / thẻ quốc tế — xác nhận tức thì</span>
+                  </span>
+                  <span className="font-semibold">{formatPrice(b.depositAmount)}</span>
                 </button>
               )}
               <button
                 onClick={() => pay('COD')}
                 disabled={paying !== null}
-                className="w-full rounded-lg border border-emerald-600 px-4 py-3 font-semibold text-emerald-700 hover:bg-emerald-50 disabled:opacity-50"
+                className="flex w-full items-center gap-4 rounded-2xl border-2 border-cream-300 bg-white px-5 py-4 text-left transition hover:border-forest-300 disabled:opacity-50"
               >
-                {paying === 'COD' ? 'Đang xử lý...' : 'Thanh toán khi nhận (COD)'}
+                <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-forest-100 text-lg">💵</span>
+                <span className="flex-1">
+                  <span className="block font-semibold text-forest-900">
+                    {paying === 'COD' ? 'Đang xử lý...' : 'Thanh toán khi nhận (COD)'}
+                  </span>
+                  <span className="block text-xs text-forest-400">Giữ chỗ và thanh toán trực tiếp sau</span>
+                </span>
               </button>
             </div>
-            <p className="mt-2 text-xs text-slate-400">
-              Cổng VNPAY chạy ở môi trường sandbox — không dùng thẻ thật. {!vnpayEnabled && 'Hiện chỉ bật COD (chưa cấu hình VNPAY).'}
+            <p className="mt-3 flex items-center gap-1.5 text-xs text-forest-400">
+              🔒 Cổng VNPAY chạy ở môi trường sandbox — không dùng thẻ thật.
+              {!vnpayEnabled && ' Hiện chỉ bật COD (chưa cấu hình VNPAY).'}
             </p>
           </div>
         ) : (
-          <Link to="/" className="mt-6 block rounded-lg bg-emerald-600 px-4 py-2 text-center text-sm font-medium text-white hover:bg-emerald-700">
-            Về trang chủ
-          </Link>
+          <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+            <Link to="/orders" className="flex-1 rounded-full bg-forest-700 px-5 py-3 text-center text-sm font-semibold text-cream-50 hover:bg-forest-800">
+              Xem đơn của tôi
+            </Link>
+            <Link to="/" className="flex-1 rounded-full border border-forest-300 px-5 py-3 text-center text-sm font-semibold text-forest-700 hover:bg-forest-50">
+              Về trang chủ
+            </Link>
+          </div>
         )}
       </div>
     )
@@ -472,8 +536,8 @@ export function BookingPage() {
 function Row({ label, value, strong }: { label: string; value: string; strong?: boolean }) {
   return (
     <div className="flex items-center justify-between">
-      <span className="text-slate-500">{label}</span>
-      <span className={strong ? 'font-bold text-emerald-700' : 'text-slate-800'}>{value}</span>
+      <span className="text-forest-400">{label}</span>
+      <span className={strong ? 'font-bold text-forest-700' : 'text-forest-800'}>{value}</span>
     </div>
   )
 }
