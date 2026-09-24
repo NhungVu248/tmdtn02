@@ -310,17 +310,46 @@ export function BookingPage() {
             )}
 
             <p className="font-display text-lg font-semibold text-forest-900">{b.productName}</p>
-            <p className="text-sm text-forest-400">
-              {isTour
-                ? `${b.guests} người lớn${b.children ? ` · ${b.children} trẻ em` : ''}`
-                : `${b.nights} đêm · ${b.guests} khách`}
-            </p>
+            {detail?.product.location && (
+              <p className="mt-0.5 text-sm text-forest-400">📍 {detail.product.location}</p>
+            )}
 
+            {/* Thông tin lưu trú/chuyến đi & người đặt */}
+            <div className="mt-4 grid gap-4 border-t border-cream-100 pt-4 sm:grid-cols-2">
+              <div>
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-forest-400">
+                  {isTour ? 'Chuyến đi' : 'Lưu trú'}
+                </p>
+                <div className="space-y-1.5 text-sm">
+                  {isTour ? (
+                    <Row label="Ngày khởi hành" value={fmtDate(b.checkIn)} />
+                  ) : (
+                    <>
+                      <Row label="Nhận phòng" value={fmtDate(b.checkIn)} />
+                      <Row label="Trả phòng" value={fmtDate(b.checkOut)} />
+                      <Row label="Số đêm" value={`${b.nights ?? '-'} đêm`} />
+                    </>
+                  )}
+                  <Row label="Số khách" value={`${b.guests} người lớn${b.children ? ` · ${b.children} trẻ em` : ''}`} />
+                </div>
+              </div>
+              <div>
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-forest-400">Người đặt</p>
+                <div className="space-y-1.5 text-sm">
+                  <Row label="Họ tên" value={b.guestName} />
+                  <Row label="Email" value={b.guestEmail} />
+                  <Row label="Điện thoại" value={b.guestPhone} />
+                </div>
+              </div>
+            </div>
+
+            {/* Chi tiết thanh toán */}
             <div className="mt-4 space-y-2 border-t border-cream-100 pt-4 text-sm">
               {!!b.discountAmount && (
                 <Row label={`Mã giảm giá (${b.discountCode})`} value={`-${formatPrice(b.discountAmount)}`} />
               )}
               <Row label="Tổng tiền" value={formatPrice(b.totalPrice)} />
+              <Row label={`Tỷ lệ đặt cọc (${Math.round(depositRate * 100)}%)`} value={formatPrice(b.depositAmount)} />
               <Row label="Còn lại (trả sau)" value={formatPrice(b.remainingAmount)} />
             </div>
 
@@ -329,6 +358,21 @@ export function BookingPage() {
               <span className="text-sm">{paid ? 'Đã đặt cọc' : 'Số tiền cần đặt cọc'}</span>
               <span className="font-display text-2xl font-bold">{formatPrice(b.depositAmount)}</span>
             </div>
+
+            {/* Thời hạn giữ chỗ */}
+            {!paid && b.heldUntil && (
+              <div className="mt-3 flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-800">
+                ⏳ Vui lòng đặt cọc trước <span className="font-semibold">{fmtDateTime(b.heldUntil)}</span> để giữ chỗ.
+              </div>
+            )}
+
+            {/* Chính sách hủy */}
+            {detail?.product.cancellationPolicy && (
+              <details className="mt-3 rounded-xl border border-cream-200 px-4 py-3 text-sm">
+                <summary className="cursor-pointer font-medium text-forest-700">🛈 Chính sách hủy &amp; hoàn tiền</summary>
+                <p className="mt-2 leading-relaxed text-forest-400">{detail.product.cancellationPolicy}</p>
+              </details>
+            )}
           </div>
         </div>
 
@@ -532,6 +576,9 @@ export function BookingPage() {
     </div>
   )
 }
+
+const fmtDate = (s: string | null) => (s ? new Date(s).toLocaleDateString('vi-VN') : '-')
+const fmtDateTime = (s: string | null) => (s ? new Date(s).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' }) : '-')
 
 function Row({ label, value, strong }: { label: string; value: string; strong?: boolean }) {
   return (
