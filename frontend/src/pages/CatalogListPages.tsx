@@ -15,7 +15,6 @@ function CatalogList({ kind }: { kind: 'HOMESTAY' | 'TOUR' }) {
   const navigate = useNavigate()
   const [items, setItems] = useState<Product[]>([])
   const [status, setStatus] = useState<'loading' | 'ok' | 'error'>('loading')
-  const [q, setQ] = useState('')
   const [idea, setIdea] = useState('') // ô tìm kiếm ý tưởng (trang tour)
 
   const load = useCallback(() => {
@@ -34,10 +33,6 @@ function CatalogList({ kind }: { kind: 'HOMESTAY' | 'TOUR' }) {
   const subtitle = isHomestay
     ? 'Khám phá các homestay, villa, căn hộ đa dạng trên khắp Việt Nam.'
     : 'Những hành trình trọn gói theo vùng miền và chủ đề yêu thích.'
-
-  const filtered = q.trim()
-    ? items.filter((i) => (i.name + ' ' + (i.location ?? '')).toLowerCase().includes(q.trim().toLowerCase()))
-    : items
 
   function submitIdea(e: React.FormEvent) {
     e.preventDefault()
@@ -115,28 +110,19 @@ function CatalogList({ kind }: { kind: 'HOMESTAY' | 'TOUR' }) {
           <p className="mt-1 text-forest-400">{subtitle}</p>
         </div>
 
-        <div className="mb-6">
-          <input
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder={isHomestay ? 'Lọc nhanh theo tên hoặc địa điểm...' : 'Tìm tour theo tên hoặc điểm đến...'}
-            className="w-full max-w-md rounded-full border border-cream-300 bg-white px-5 py-2.5 text-sm text-forest-900 placeholder:text-forest-300 focus:border-forest-400 focus:outline-none"
-          />
-        </div>
-
         {status === 'loading' ? (
           <Loading />
         ) : status === 'error' ? (
           <ErrorState onRetry={load} />
-        ) : filtered.length === 0 ? (
+        ) : items.length === 0 ? (
           <p className="py-16 text-center text-forest-400">Chưa có {isHomestay ? 'chỗ nghỉ' : 'tour'} nào phù hợp.</p>
         ) : (
           <>
             <p className="mb-4 text-sm text-forest-500">
-              <span className="font-semibold text-forest-800">{filtered.length}</span> kết quả
+              <span className="font-semibold text-forest-800">{items.length}</span> kết quả
             </p>
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
-              {filtered.map((p) => (
+              {items.map((p) => (
                 <ProductCard key={`${p.type}-${p.id}`} product={p} />
               ))}
             </div>
