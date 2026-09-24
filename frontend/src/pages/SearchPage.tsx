@@ -250,7 +250,7 @@ export function SearchPage() {
           {!invalid && status === 'ok' && data && data.count > 0 && (
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">
               {data.items.map((p) => (
-                <div key={p.id}>
+                <div key={`${p.type}-${p.id}`}>
                   <ProductCard product={p} />
                   {p.totalPrice != null && (
                     <p className="mt-1 px-1 text-xs text-forest-400">

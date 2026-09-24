@@ -146,7 +146,7 @@ export function HomePage() {
             </div>
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
               {data.featured.map((p) => (
-                <ProductCard key={p.id} product={p} />
+                <ProductCard key={`${p.type}-${p.id}`} product={p} />
               ))}
             </div>
           </section>
