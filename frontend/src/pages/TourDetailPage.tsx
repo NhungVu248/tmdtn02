@@ -158,6 +158,15 @@ export function TourDetailPage() {
                       <span className="text-amber-500">{'★'.repeat(r.rating)}</span>
                     </div>
                     {r.comment && <p className="mt-1 text-sm text-slate-600">{r.comment}</p>}
+                    {r.images && r.images.length > 0 && (
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {r.images.map((im) => (
+                          <a key={im.id} href={im.url} target="_blank" rel="noreferrer" className="block h-20 w-20 overflow-hidden rounded-lg border border-slate-200">
+                            <img src={im.url} alt="" className="h-full w-full object-cover transition hover:scale-105" />
+                          </a>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>

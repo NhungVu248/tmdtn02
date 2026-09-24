@@ -60,8 +60,8 @@ export function OrderDetailCard({ order, guestAuth, onChanged }: Props) {
   }
 
   // UC-15 – Customer gửi đánh giá trực tiếp từ "Đơn của tôi" (Guest đánh giá qua link email riêng).
-  async function submitReview(rating: number, comment: string) {
-    const r = await api.submitMyReview({ code: order.code, rating, comment: comment || undefined })
+  async function submitReview(rating: number, comment: string, images: string[]) {
+    const r = await api.submitMyReview({ code: order.code, rating, comment: comment || undefined, images })
     setReviewDone(r.message)
     setReviewing(false)
   }

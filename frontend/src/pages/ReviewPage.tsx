@@ -33,8 +33,8 @@ export function ReviewPage() {
       })
   }, [token])
 
-  async function submit(rating: number, comment: string) {
-    const r = await api.submitGuestReview({ token, rating, comment: comment || undefined })
+  async function submit(rating: number, comment: string, images: string[]) {
+    const r = await api.submitGuestReview({ token, rating, comment: comment || undefined, images })
     setDone(r.message)
   }
 

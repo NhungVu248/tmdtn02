@@ -48,7 +48,7 @@ export async function getTourDetail(req, res, next) {
         itinerary: { orderBy: { dayNumber: 'asc' } },
         inclusions: { orderBy: { sortOrder: 'asc' } },
         notes: { orderBy: { sortOrder: 'asc' } },
-        reviews: { where: { approved: true }, orderBy: { createdAt: 'desc' } },
+        reviews: { where: { approved: true }, orderBy: { createdAt: 'desc' }, include: { images: { orderBy: { sortOrder: 'asc' } } } },
         departures: {
           where: { departureDate: { gte: startOfToday() }, status: { in: ['OPEN', 'FULL'] } },
           orderBy: { departureDate: 'asc' },

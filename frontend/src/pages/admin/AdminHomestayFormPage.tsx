@@ -1,13 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { AdminApiError, adminApi, type AdminAmenity, type AdminProductDetail, type AdminPropertyCat, type AdminRoomType } from '../../lib/adminApi'
+import { CategoryCombo, resolveCategoryId } from '../../components/admin/CategoryCombo'
 
 const field = 'w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:border-emerald-500 focus:outline-none'
 const label = 'mb-1 block text-sm text-slate-300'
 
 const empty = {
   name: '', slug: '', propertyCode: '', propertyType: 'HOMESTAY', starRating: '', shortDescription: '', description: '',
-  provinceId: '', areaId: '', address: '', latitude: '', longitude: '', checkInTime: '14:00', checkOutTime: '12:00',
+  address: '', latitude: '', longitude: '', checkInTime: '14:00', checkOutTime: '12:00',
   basePrice: '', depositRate: '', cancellationPolicyId: '', contactPhone: '', contactEmail: '', metaTitle: '', metaDescription: '', houseRules: '',
 }
 
@@ -18,6 +19,8 @@ export function AdminHomestayFormPage() {
   const fileInput = useRef<HTMLInputElement>(null)
 
   const [f, setF] = useState({ ...empty })
+  const [provinceName, setProvinceName] = useState('')
+  const [areaName, setAreaName] = useState('')
   const [amenityIds, setAmenityIds] = useState<number[]>([])
   const [images, setImages] = useState<AdminProductDetail['images']>([])
   const [roomTypes, setRoomTypes] = useState<AdminRoomType[]>([])
@@ -25,25 +28,11 @@ export function AdminHomestayFormPage() {
   const [meta, setMeta] = useState<{ provinces: AdminPropertyCat[]; areas: AdminPropertyCat[]; amenities: AdminAmenity[]; policies: { id: number; name: string }[] }>({ provinces: [], areas: [], amenities: [], policies: [] })
 
   const [error, setError] = useState<string | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [loaded, setLoaded] = useState(!isEdit)
   const set = (k: keyof typeof empty, v: string) => setF((p) => ({ ...p, [k]: v }))
-
-  // "➕ Thêm mới…": hỏi tên, tạo tỉnh/khu vực mới rồi chọn luôn (BR: danh mục do admin tự mở rộng).
-  async function onCatSelect(kind: 'province' | 'area', value: string) {
-    const key = kind === 'province' ? 'provinceId' : 'areaId'
-    if (value !== '__new__') { set(key, value); return }
-    const name = window.prompt(kind === 'province' ? 'Tên tỉnh/thành mới:' : 'Tên khu vực mới:')?.trim()
-    if (!name) return
-    try {
-      const { category } = await adminApi.createHomestayCategory(kind, name)
-      setMeta((m) => ({ ...m, [kind === 'province' ? 'provinces' : 'areas']: [...m[kind === 'province' ? 'provinces' : 'areas'], category] }))
-      set(key, String(category.id))
-    } catch (err) {
-      setError(err instanceof AdminApiError ? err.message : 'Không thêm được danh mục')
-    }
-  }
 
   useEffect(() => {
     adminApi.getHomestayMeta().then(setMeta).catch(() => {})
@@ -57,23 +46,25 @@ export function AdminHomestayFormPage() {
     setF({
       name: p.name, slug: p.slug, propertyCode: p.propertyCode, propertyType: p.propertyType, starRating: p.starRating != null ? String(p.starRating) : '',
       shortDescription: p.shortDescription ?? '', description: p.description ?? '',
-      provinceId: p.provinceId != null ? String(p.provinceId) : '', areaId: p.areaId != null ? String(p.areaId) : '', address: p.address ?? '',
+      address: p.address ?? '',
       latitude: p.latitude != null ? String(p.latitude) : '', longitude: p.longitude != null ? String(p.longitude) : '',
       checkInTime: p.checkInTime ?? '', checkOutTime: p.checkOutTime ?? '', basePrice: String(p.basePrice), depositRate: p.depositRate != null ? String(p.depositRate) : '',
       cancellationPolicyId: p.cancellationPolicyId != null ? String(p.cancellationPolicyId) : '', contactPhone: p.contactPhone ?? '', contactEmail: p.contactEmail ?? '',
-      metaTitle: p.metaTitle ?? '', metaDescription: p.metaDescription ?? '', houseRules: p.policies.map((x) => x.content).join('\n'),
+      metaTitle: p.metaTitle ?? '', metaDescription: p.metaDescription ?? '', houseRules: (p.policies ?? []).map((x) => x.content).join('\n'),
     })
-    setAmenityIds(p.amenities.map((a) => a.amenity.id))
-    setImages(p.images)
-    setRoomTypes(p.roomTypes)
+    setProvinceName(p.province?.name ?? '')
+    setAreaName(p.area?.name ?? '')
+    setAmenityIds((p.amenities ?? []).map((a) => a.amenity.id))
+    setImages(p.images ?? [])
+    setRoomTypes(p.roomTypes ?? [])
     setPropId(p.id)
   }
 
-  function buildPayload() {
+  function buildPayload(provinceId?: number, areaId?: number) {
     return {
       name: f.name, slug: f.slug || undefined, propertyCode: f.propertyCode || undefined, propertyType: f.propertyType,
       starRating: f.starRating || undefined, shortDescription: f.shortDescription || undefined, description: f.description || undefined,
-      provinceId: f.provinceId || undefined, areaId: f.areaId || undefined, address: f.address || undefined,
+      provinceId: provinceId ?? undefined, areaId: areaId ?? undefined, address: f.address || undefined,
       latitude: f.latitude || undefined, longitude: f.longitude || undefined, checkInTime: f.checkInTime || undefined, checkOutTime: f.checkOutTime || undefined,
       basePrice: Number(f.basePrice), depositRate: f.depositRate || undefined, cancellationPolicyId: f.cancellationPolicyId || undefined,
       contactPhone: f.contactPhone || undefined, contactEmail: f.contactEmail || undefined, metaTitle: f.metaTitle || undefined, metaDescription: f.metaDescription || undefined,
@@ -84,18 +75,24 @@ export function AdminHomestayFormPage() {
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
-    setError(null); setSaving(true)
+    setError(null); setNotice(null); setSaving(true)
     try {
-      if (isEdit && id) { const { property } = await adminApi.updateHomestay(Number(id), buildPayload()); fill(property) }
-      else { const { property } = await adminApi.createHomestay(buildPayload()); navigate(`/admin/homestays/${property.id}/edit`, { replace: true }); return }
+      // Giải quyết tỉnh/khu vực: chọn có sẵn -> dùng id; gõ mới -> tự tạo danh mục rồi lấy id.
+      const provinceId = await resolveCategoryId(provinceName, meta.provinces, async (n) => {
+        const { category } = await adminApi.createHomestayCategory('province', n)
+        setMeta((m) => ({ ...m, provinces: [...m.provinces, category] }))
+        return category
+      })
+      const areaId = await resolveCategoryId(areaName, meta.areas, async (n) => {
+        const { category } = await adminApi.createHomestayCategory('area', n)
+        setMeta((m) => ({ ...m, areas: [...m.areas, category] }))
+        return category
+      })
+      if (isEdit && id) { const { property } = await adminApi.updateHomestay(Number(id), buildPayload(provinceId, areaId)); fill(property); setNotice('Đã lưu thay đổi.') }
+      else { const { property } = await adminApi.createHomestay(buildPayload(provinceId, areaId)); navigate(`/admin/homestays/${property.id}/edit`, { replace: true }); return }
     } catch (err) {
-      // 5a: lỗi từ máy chủ (AdminApiError) hiện nguyên thông báo; lỗi fetch bị reject
-      // (mất kết nối, máy chủ đang khởi động lại) hiện gợi ý thử lại thay vì "Lưu thất bại." chung chung.
-      setError(
-        err instanceof AdminApiError
-          ? err.message
-          : 'Không gửi được yêu cầu đến máy chủ. Kiểm tra kết nối rồi bấm Lưu lại.',
-      )
+      // 5a: lỗi từ máy chủ hiện nguyên thông báo; lỗi fetch bị reject (mất kết nối, máy chủ khởi động lại).
+      setError(err instanceof AdminApiError ? err.message : 'Không gửi được yêu cầu đến máy chủ. Kiểm tra kết nối rồi bấm Lưu lại.')
     } finally { setSaving(false) }
   }
 
@@ -137,18 +134,9 @@ export function AdminHomestayFormPage() {
             </div>
             <div><label className={label}>Hạng sao</label><input className={field} type="number" min={0} max={5} value={f.starRating} onChange={(e) => set('starRating', e.target.value)} /></div>
             <div className="col-span-2"><label className={label}>Mô tả ngắn</label><input className={field} value={f.shortDescription} onChange={(e) => set('shortDescription', e.target.value)} /></div>
-            <div><label className={label}>Tỉnh/Thành</label>
-              <select className={field} value={f.provinceId} onChange={(e) => onCatSelect('province', e.target.value)}>
-                <option value="">— Chọn —</option>{meta.provinces.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                <option value="__new__">➕ Thêm tỉnh/thành mới…</option>
-              </select>
-            </div>
-            <div><label className={label}>Khu vực</label>
-              <select className={field} value={f.areaId} onChange={(e) => onCatSelect('area', e.target.value)}>
-                <option value="">— Chọn —</option>{meta.areas.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                <option value="__new__">➕ Thêm khu vực mới…</option>
-              </select>
-            </div>
+            <CategoryCombo label="Tỉnh/Thành" value={provinceName} onChange={setProvinceName} options={meta.provinces} placeholder="Chọn hoặc gõ tỉnh/thành mới" />
+            <CategoryCombo label="Khu vực" value={areaName} onChange={setAreaName} options={meta.areas} placeholder="Chọn hoặc gõ khu vực mới" />
+
             <div className="col-span-2"><label className={label}>Địa chỉ đầy đủ</label><input className={field} value={f.address} onChange={(e) => set('address', e.target.value)} /></div>
             <div><label className={label}>Vĩ độ (latitude)</label><input className={field} value={f.latitude} onChange={(e) => set('latitude', e.target.value)} /></div>
             <div><label className={label}>Kinh độ (longitude)</label><input className={field} value={f.longitude} onChange={(e) => set('longitude', e.target.value)} /></div>
@@ -216,6 +204,7 @@ export function AdminHomestayFormPage() {
         )}
 
         {error && <div className="rounded-lg border border-red-800 bg-red-950/40 px-3 py-2 text-sm text-red-300">⚠️ {error}</div>}
+        {notice && <div className="rounded-lg border border-emerald-800 bg-emerald-950/40 px-3 py-2 text-sm text-emerald-300">✓ {notice}</div>}
         <button type="submit" disabled={saving} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50">{saving ? 'Đang lưu...' : isEdit ? 'Lưu thay đổi' : 'Tạo chỗ nghỉ'}</button>
       </form>
 

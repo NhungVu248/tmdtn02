@@ -221,10 +221,23 @@ export async function updateTour(req, res, next) {
       }
     }
 
-    const tour = await prisma.$transaction(async (tx) => {
-      const updated = await tx.tour.update({ where: { id }, data })
+    await prisma.$transaction(async (tx) => {
+      await tx.tour.update({ where: { id }, data })
       await replaceSubEntities(tx, id, req.body)
-      return updated
+    })
+    // Trả về tour ĐẦY ĐỦ (kèm quan hệ) đúng shape getTour để frontend fillForm() không lỗi.
+    const tour = await prisma.tour.findUnique({
+      where: { id },
+      include: {
+        images: { orderBy: { sortOrder: 'asc' } },
+        region: true,
+        theme: true,
+        cancellationPolicy: true,
+        itinerary: { orderBy: { dayNumber: 'asc' } },
+        inclusions: { orderBy: { sortOrder: 'asc' } },
+        notes: { orderBy: { sortOrder: 'asc' } },
+        departures: { orderBy: { departureDate: 'asc' }, include: { prices: true } },
+      },
     })
 
     await logAdminAction(req.admin.sub, 'tour.update', { entityType: 'Tour', entityId: id, detail: { title: tour.title } })
@@ -435,6 +448,27 @@ export async function tourCategories(req, res, next) {
       durations: cats.filter((c) => c.kind === 'duration'),
       policies: await prisma.cancellationPolicy.findMany({ orderBy: { id: 'asc' } }),
     })
+  } catch (err) {
+    next(err)
+  }
+}
+
+// Tạo mới vùng miền (region) hoặc chủ đề (theme) tour ngay từ form.
+export async function createTourCategory(req, res, next) {
+  try {
+    const name = req.body.name != null ? String(req.body.name).trim() : ''
+    const kind = req.body.kind === 'theme' ? 'theme' : 'region'
+    if (!name) return res.status(400).json({ message: 'Thiếu tên' })
+    let base = slugify(name) || kind
+    let slug = `${kind}-${base}`
+    let n = 1
+    while (await prisma.category.findUnique({ where: { slug } })) slug = `${kind}-${base}-${++n}`
+    const maxOrder = await prisma.category.aggregate({ where: { type: 'TOUR', kind }, _max: { order: true } })
+    const category = await prisma.category.create({
+      data: { name, slug, type: 'TOUR', kind, order: (maxOrder._max.order ?? 0) + 1 },
+    })
+    await logAdminAction(req.admin.sub, 'category.create', { entityType: 'Category', entityId: category.id, detail: { name, kind } })
+    res.status(201).json({ category })
   } catch (err) {
     next(err)
   }

@@ -219,6 +219,8 @@ export const adminApi = {
       { status },
     ),
   getTourCategories: () => get<{ regions: AdminTourCat[]; themes: AdminTourCat[]; durations: AdminTourCat[]; policies: { id: number; name: string }[] }>('/api/admin/tours/categories'),
+  createTourCategory: (kind: 'region' | 'theme', name: string) =>
+    post<{ category: AdminTourCat }>('/api/admin/tours/categories', { kind, name }),
   uploadTourImage: async (file: File) => {
     const form = new FormData()
     form.append('file', file)
@@ -246,6 +248,35 @@ export const adminApi = {
   ) => putReq<{ departure: Departure }>(`/api/admin/tours/${tourId}/departures/${depId}`, data),
   closeDeparture: (tourId: number, depId: number) =>
     patchReq<{ departure: Departure }>(`/api/admin/tours/${tourId}/departures/${depId}/close`, {}),
+
+  // Cẩm nang du lịch (quản trị)
+  listGuides: (params: { status?: string; search?: string } = {}) => {
+    const qs = new URLSearchParams()
+    if (params.status) qs.set('status', params.status)
+    if (params.search) qs.set('search', params.search)
+    return get<{ items: AdminGuideListItem[] }>(`/api/admin/guides?${qs.toString()}`)
+  },
+  getGuide: (id: number) => get<{ guide: AdminGuideDetail }>(`/api/admin/guides/${id}`),
+  getGuideMeta: () => get<{ tours: { id: number; title: string; slug: string }[] }>('/api/admin/guides/meta'),
+  createGuide: (data: Record<string, unknown>) => post<{ guide: AdminGuideDetail }>('/api/admin/guides', data),
+  updateGuide: (id: number, data: Record<string, unknown>) => putReq<{ guide: AdminGuideDetail }>(`/api/admin/guides/${id}`, data),
+  setGuideVisibility: (id: number, status: 'DRAFT' | 'VISIBLE' | 'HIDDEN') =>
+    patchReq<{ guide: AdminGuideListItem }>(`/api/admin/guides/${id}/visibility`, { status }),
+  deleteGuide: (id: number) => del<{ ok: boolean }>(`/api/admin/guides/${id}`),
+  uploadGuideImage: async (file: File) => {
+    const form = new FormData()
+    form.append('file', file)
+    const res = await fetch(`${API_URL}/api/admin/guides/uploads/image`, {
+      method: 'POST',
+      headers: adminToken ? { Authorization: `Bearer ${adminToken}` } : undefined,
+      body: form,
+    })
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}))
+      throw new AdminApiError(res.status, body.message || 'Tải ảnh thất bại')
+    }
+    return res.json() as Promise<{ filename: string; url: string }>
+  },
 
   // UC-18 – Quản lý đơn & xử lý hủy/hoàn tiền
   listOrders: (params: { status?: string; type?: string; from?: string; to?: string; search?: string } = {}) => {
@@ -563,4 +594,34 @@ export interface AdminTourDetail extends AdminTour {
   inclusions: { id: number; type: 'INCLUDED' | 'EXCLUDED'; itemText: string }[]
   notes: { id: number; type: 'TERM' | 'FAQ' | 'REDEMPTION'; title: string | null; content: string }[]
   departures: Departure[]
+}
+
+// Cẩm nang du lịch (quản trị)
+export interface AdminGuideListItem {
+  id: number
+  title: string
+  slug: string
+  authorName: string | null
+  coverImage: string | null
+  locationName: string | null
+  publishedAt: string | null
+  status: 'DRAFT' | 'VISIBLE' | 'HIDDEN'
+  updatedAt: string
+  _count?: { relatedTours: number }
+}
+
+export interface AdminGuideDetail {
+  id: number
+  title: string
+  slug: string
+  authorName: string | null
+  coverImage: string | null
+  excerpt: string | null
+  content: string
+  locationName: string | null
+  latitude: number | null
+  longitude: number | null
+  publishedAt: string | null
+  status: 'DRAFT' | 'VISIBLE' | 'HIDDEN'
+  relatedTours: { guideId: number; tourId: number; tour: { id: number; title: string; slug: string } }[]
 }

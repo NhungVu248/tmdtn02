@@ -36,6 +36,13 @@ export const uploadImage = multer({
   limits: { fileSize: MAX_SIZE, files: 1 },
 })
 
+// UC-15 – Tải nhiều ảnh cùng lúc (đính kèm đánh giá): tối đa 6 ảnh/lần.
+export const uploadImages = multer({
+  storage,
+  fileFilter,
+  limits: { fileSize: MAX_SIZE, files: 6 },
+})
+
 export function publicUploadUrl(filename) {
   const base = process.env.BACKEND_URL || 'http://localhost:4000'
   return `${base}/uploads/${filename}`

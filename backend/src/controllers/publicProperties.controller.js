@@ -45,7 +45,7 @@ export async function getPropertyDetail(req, res, next) {
         amenities: { include: { amenity: true } },
         policies: { orderBy: { sortOrder: 'asc' } },
         roomTypes: { include: { images: { orderBy: { sortOrder: 'asc' } } } },
-        reviews: { where: { approved: true }, orderBy: { createdAt: 'desc' } },
+        reviews: { where: { approved: true }, orderBy: { createdAt: 'desc' }, include: { images: { orderBy: { sortOrder: 'asc' } } } },
       },
     })
     if (!property || property.status !== 'VISIBLE') {

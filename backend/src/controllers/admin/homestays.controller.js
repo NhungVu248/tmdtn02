@@ -195,10 +195,20 @@ export async function updateHomestay(req, res, next) {
         data.slug = slug
       }
     }
-    const property = await prisma.$transaction(async (tx) => {
-      const updated = await tx.property.update({ where: { id }, data })
+    await prisma.$transaction(async (tx) => {
+      await tx.property.update({ where: { id }, data })
       await replaceAmenitiesAndPolicies(tx, id, req.body)
-      return updated
+    })
+    // Trả về property ĐẦY ĐỦ (kèm quan hệ) đúng shape getHomestay để frontend fill() không lỗi.
+    const property = await prisma.property.findUnique({
+      where: { id },
+      include: {
+        images: { orderBy: { sortOrder: 'asc' } },
+        province: true, area: true, cancellationPolicy: true,
+        amenities: { include: { amenity: true } },
+        policies: { orderBy: { sortOrder: 'asc' } },
+        roomTypes: { include: { _count: { select: { inventory: true } } } },
+      },
     })
     await logAdminAction(req.admin.sub, 'property.update', { entityType: 'Property', entityId: id, detail: { name: property.name } })
     res.json({ property })

@@ -34,7 +34,7 @@ export async function listReviews(req, res, next) {
 
     const rows = await prisma.review.findMany({
       where,
-      include: { property: { select: { name: true, slug: true } }, tour: { select: { title: true, slug: true } } },
+      include: { property: { select: { name: true, slug: true } }, tour: { select: { title: true, slug: true } }, images: { orderBy: { sortOrder: 'asc' } } },
       orderBy: { createdAt: 'desc' },
       take: 300,
     })

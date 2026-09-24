@@ -14,12 +14,18 @@ export function Layout() {
           </Link>
           <CategoryMenu />
           <div className="ml-auto flex items-center gap-3 text-sm">
-            <Link to="/info" className="text-slate-600 hover:text-emerald-700">
-              Thông tin & chính sách
+            <Link to="/guides" className="text-slate-600 hover:text-emerald-700">
+              Cẩm nang du lịch
             </Link>
-            <Link to="/track" className="text-slate-600 hover:text-emerald-700">
-              Tra cứu đơn
+            <Link to="/about" className="text-slate-600 hover:text-emerald-700">
+              Giới thiệu
             </Link>
+            {/* "Tra cứu đơn" chỉ dành cho khách chưa đăng nhập; người đã đăng nhập dùng "Đơn của tôi". */}
+            {!user && (
+              <Link to="/track" className="text-slate-600 hover:text-emerald-700">
+                Tra cứu đơn
+              </Link>
+            )}
             {user ? (
               <div className="flex items-center gap-3">
                 <Link to="/orders" className="text-slate-600 hover:text-emerald-700">
@@ -70,7 +76,8 @@ export function Layout() {
             <Link to="/info/dieu-kien-giao-dich" className="hover:text-emerald-700">Điều kiện giao dịch chung</Link>
             <Link to="/info/chinh-sach-doi-tra-huy" className="hover:text-emerald-700">Chính sách đổi–trả–hủy</Link>
             <Link to="/info/bao-mat-du-lieu" className="hover:text-emerald-700">Bảo vệ dữ liệu cá nhân</Link>
-            <Link to="/info" className="hover:text-emerald-700">Cẩm nang du lịch</Link>
+            <Link to="/guides" className="hover:text-emerald-700">Cẩm nang du lịch</Link>
+            <Link to="/about" className="hover:text-emerald-700">Giới thiệu website</Link>
           </div>
           <p className="mt-4">© 2026 StayTour — Đồ án Thương mại điện tử (Nhóm 09).</p>
         </div>

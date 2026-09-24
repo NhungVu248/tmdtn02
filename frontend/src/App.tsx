@@ -14,6 +14,8 @@ import { AdminHomestayCalendarPage } from './pages/admin/AdminHomestayCalendarPa
 import { AdminToursPage } from './pages/admin/AdminToursPage'
 import { AdminTourFormPage } from './pages/admin/AdminTourFormPage'
 import { AdminTourDeparturesPage } from './pages/admin/AdminTourDeparturesPage'
+import { AdminGuidesPage } from './pages/admin/AdminGuidesPage'
+import { AdminGuideFormPage } from './pages/admin/AdminGuideFormPage'
 import { AdminOrdersPage } from './pages/admin/AdminOrdersPage'
 import { AdminOrderDetailPage } from './pages/admin/AdminOrderDetailPage'
 import { AdminUsersPage } from './pages/admin/AdminUsersPage'
@@ -27,6 +29,9 @@ import { SearchPage } from './pages/SearchPage'
 import { ProductDetailPage } from './pages/ProductDetailPage'
 import { TourDetailPage } from './pages/TourDetailPage'
 import { InfoArticlePage, InfoIndexPage } from './pages/InfoPages'
+import { HomestayListPage, TourListPage } from './pages/CatalogListPages'
+import { GuideDetailPage, GuideListPage } from './pages/GuidePages'
+import { AboutPage } from './pages/AboutPage'
 import { RegisterPage } from './pages/RegisterPage'
 import { VerifyEmailPage } from './pages/VerifyEmailPage'
 import { LoginPage } from './pages/LoginPage'
@@ -69,6 +74,10 @@ function App() {
           <Route path="tours/new" element={<AdminTourFormPage />} />
           <Route path="tours/:id/edit" element={<AdminTourFormPage />} />
           <Route path="tours/:id/departures" element={<AdminTourDeparturesPage />} />
+          {/* Quản lý cẩm nang du lịch */}
+          <Route path="guides" element={<AdminGuidesPage />} />
+          <Route path="guides/new" element={<AdminGuideFormPage />} />
+          <Route path="guides/:id/edit" element={<AdminGuideFormPage />} />
           {/* UC-18 – Quản lý đơn & xử lý hủy/hoàn tiền */}
           <Route path="orders" element={<AdminOrdersPage />} />
           <Route path="orders/:code" element={<AdminOrderDetailPage />} />
@@ -90,6 +99,14 @@ function App() {
           <Route path="category/:slug" element={<CategoryPage />} />
           {/* Điều hướng sang các use case khác của Nhóm A */}
           <Route path="search" element={<SearchPage />} />
+          {/* Trang danh sách Homestay / Tour riêng */}
+          <Route path="homestays" element={<HomestayListPage />} />
+          <Route path="tours" element={<TourListPage />} />
+          {/* Cẩm nang du lịch */}
+          <Route path="guides" element={<GuideListPage />} />
+          <Route path="guides/:slug" element={<GuideDetailPage />} />
+          {/* Giới thiệu website */}
+          <Route path="about" element={<AboutPage />} />
           {/* UC-03 – Xem chi tiết & tình trạng còn trống */}
           <Route path="product/:slug" element={<ProductDetailPage />} />
           {/* UC-03 – Chi tiết tour (bảng riêng) */}

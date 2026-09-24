@@ -22,6 +22,7 @@ export function AdminLayout() {
             <NavItem to="/admin">Tổng quan</NavItem>
             <NavItem to="/admin/homestays">Homestay (UC-16)</NavItem>
             <NavItem to="/admin/tours">Tour (UC-17)</NavItem>
+            <NavItem to="/admin/guides">Cẩm nang du lịch</NavItem>
             <NavItem to="/admin/orders">Đơn hàng (UC-18)</NavItem>
             <NavItem to="/admin/users">Người dùng (UC-19)</NavItem>
             <NavItem to="/admin/discounts">Mã khuyến mại (UC-20)</NavItem>

@@ -1,13 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { AdminApiError, adminApi, type AdminTourCat, type AdminTourDetail, type TourImage } from '../../lib/adminApi'
+import { CategoryCombo, resolveCategoryId } from '../../components/admin/CategoryCombo'
 
 const field = 'w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:border-emerald-500 focus:outline-none'
 const label = 'mb-1 block text-sm text-slate-300'
 
 const empty = {
   title: '', slug: '', tourCode: '', shortDescription: '', description: '', highlights: '',
-  regionId: '', themeId: '', durationDays: '1', durationNights: '0', departurePoint: '', destination: '',
+  durationDays: '1', durationNights: '0', departurePoint: '', destination: '',
   meetingPoint: '', minPax: '1', maxPax: '30', guideLanguage: '', basePrice: '', depositRate: '',
   cancellationPolicyId: '', metaTitle: '', metaDescription: '', itinerary: '', included: '', excluded: '', note: '',
 }
@@ -20,11 +21,14 @@ export function AdminTourFormPage() {
   const fileInput = useRef<HTMLInputElement>(null)
 
   const [f, setF] = useState({ ...empty })
+  const [regionName, setRegionName] = useState('')
+  const [themeName, setThemeName] = useState('')
   const [images, setImages] = useState<TourImage[]>([])
   const [tourId, setTourId] = useState<number | null>(null)
   const [cats, setCats] = useState<{ regions: AdminTourCat[]; themes: AdminTourCat[]; policies: { id: number; name: string }[] }>({ regions: [], themes: [], policies: [] })
 
   const [error, setError] = useState<string | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [loaded, setLoaded] = useState(!isEdit)
@@ -47,23 +51,24 @@ export function AdminTourFormPage() {
     setF({
       title: t.title, slug: t.slug, tourCode: t.tourCode, shortDescription: t.shortDescription ?? '',
       description: t.description ?? '', highlights: t.highlights ?? '',
-      regionId: t.regionId != null ? String(t.regionId) : '', themeId: t.themeId != null ? String(t.themeId) : '',
       durationDays: String(t.durationDays), durationNights: String(t.durationNights),
       departurePoint: t.departurePoint ?? '', destination: t.destination ?? '', meetingPoint: t.meetingPoint ?? '',
       minPax: String(t.minPax), maxPax: String(t.maxPax), guideLanguage: t.guideLanguage ?? '',
       basePrice: String(t.basePrice), depositRate: t.depositRate != null ? String(t.depositRate) : '',
       cancellationPolicyId: t.cancellationPolicyId != null ? String(t.cancellationPolicyId) : '',
       metaTitle: t.metaTitle ?? '', metaDescription: t.metaDescription ?? '',
-      itinerary: t.itinerary.map((it) => `${it.title || 'Ngày ' + it.dayNumber}: ${it.description || ''}`).join('\n'),
-      included: t.inclusions.filter((i) => i.type === 'INCLUDED').map((i) => i.itemText).join('\n'),
-      excluded: t.inclusions.filter((i) => i.type === 'EXCLUDED').map((i) => i.itemText).join('\n'),
-      note: t.notes[0]?.content ?? '',
+      itinerary: (t.itinerary ?? []).map((it) => `${it.title || 'Ngày ' + it.dayNumber}: ${it.description || ''}`).join('\n'),
+      included: (t.inclusions ?? []).filter((i) => i.type === 'INCLUDED').map((i) => i.itemText).join('\n'),
+      excluded: (t.inclusions ?? []).filter((i) => i.type === 'EXCLUDED').map((i) => i.itemText).join('\n'),
+      note: (t.notes ?? [])[0]?.content ?? '',
     })
-    setImages(t.images)
+    setRegionName(t.region?.name ?? '')
+    setThemeName(t.theme?.name ?? '')
+    setImages(t.images ?? [])
     setTourId(t.id)
   }
 
-  function buildPayload() {
+  function buildPayload(regionId?: number, themeId?: number) {
     const lines = (s: string) => s.split('\n').map((x) => x.trim()).filter(Boolean)
     const itinerary = lines(f.itinerary).map((line, i) => {
       const m = line.match(/^(.*?):\s*(.*)$/)
@@ -76,8 +81,8 @@ export function AdminTourFormPage() {
       shortDescription: f.shortDescription || undefined,
       description: f.description || undefined,
       highlights: f.highlights || undefined,
-      regionId: f.regionId || undefined,
-      themeId: f.themeId || undefined,
+      regionId: regionId ?? undefined,
+      themeId: themeId ?? undefined,
       durationDays: f.durationDays || undefined,
       durationNights: f.durationNights || undefined,
       departurePoint: f.departurePoint || undefined,
@@ -101,12 +106,25 @@ export function AdminTourFormPage() {
   async function submit(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
+    setNotice(null)
     setSaving(true)
     try {
-      const payload = buildPayload()
+      // Vùng miền / chủ đề: chọn có sẵn -> id; gõ mới -> tự tạo danh mục.
+      const regionId = await resolveCategoryId(regionName, cats.regions, async (n) => {
+        const { category } = await adminApi.createTourCategory('region', n)
+        setCats((c) => ({ ...c, regions: [...c.regions, category] }))
+        return category
+      })
+      const themeId = await resolveCategoryId(themeName, cats.themes, async (n) => {
+        const { category } = await adminApi.createTourCategory('theme', n)
+        setCats((c) => ({ ...c, themes: [...c.themes, category] }))
+        return category
+      })
+      const payload = buildPayload(regionId, themeId)
       if (isEdit && id) {
         const { tour } = await adminApi.updateTour(Number(id), payload)
         fillForm(tour)
+        setNotice('Đã lưu thay đổi.')
       } else {
         const { tour } = await adminApi.createTour(payload)
         navigate(`/admin/tours/${tour.id}/edit`, { replace: true })
@@ -156,18 +174,9 @@ export function AdminTourFormPage() {
             <div><label className={label}>Mã tour</label><input className={field} value={f.tourCode} onChange={(e) => set('tourCode', e.target.value)} placeholder="Để trống -> tự sinh" /></div>
             <div><label className={label}>Đường dẫn (slug)</label><input className={field} value={f.slug} onChange={(e) => set('slug', e.target.value)} placeholder="Để trống -> tự sinh" /></div>
             <div className="col-span-2"><label className={label}>Mô tả ngắn (tagline)</label><input className={field} value={f.shortDescription} onChange={(e) => set('shortDescription', e.target.value)} /></div>
-            <div><label className={label}>Vùng miền</label>
-              <select className={field} value={f.regionId} onChange={(e) => set('regionId', e.target.value)}>
-                <option value="">— Chọn vùng —</option>
-                {cats.regions.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </select>
-            </div>
-            <div><label className={label}>Chủ đề</label>
-              <select className={field} value={f.themeId} onChange={(e) => set('themeId', e.target.value)}>
-                <option value="">— Chọn chủ đề —</option>
-                {cats.themes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </select>
-            </div>
+            <CategoryCombo label="Vùng miền" value={regionName} onChange={setRegionName} options={cats.regions} placeholder="Chọn hoặc gõ vùng miền mới" />
+            <CategoryCombo label="Chủ đề" value={themeName} onChange={setThemeName} options={cats.themes} placeholder="Chọn hoặc gõ chủ đề mới" />
+
             <div><label className={label}>Số ngày</label><input className={field} type="number" min={1} value={f.durationDays} onChange={(e) => set('durationDays', e.target.value)} /></div>
             <div><label className={label}>Số đêm</label><input className={field} type="number" min={0} value={f.durationNights} onChange={(e) => set('durationNights', e.target.value)} /></div>
             <div><label className={label}>Điểm khởi hành</label><input className={field} value={f.departurePoint} onChange={(e) => set('departurePoint', e.target.value)} /></div>
@@ -236,6 +245,7 @@ export function AdminTourFormPage() {
         )}
 
         {error && <div className="rounded-lg border border-red-800 bg-red-950/40 px-3 py-2 text-sm text-red-300">⚠️ {error}</div>}
+        {notice && <div className="rounded-lg border border-emerald-800 bg-emerald-950/40 px-3 py-2 text-sm text-emerald-300">✓ {notice}</div>}
 
         <button type="submit" disabled={saving} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50">
           {saving ? 'Đang lưu...' : isEdit ? 'Lưu thay đổi' : 'Tạo tour'}

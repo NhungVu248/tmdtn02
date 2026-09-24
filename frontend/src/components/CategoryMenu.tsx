@@ -25,7 +25,7 @@ function CategoryNode({ node, depth = 0 }: { node: Category; depth?: number }) {
   )
 }
 
-function Dropdown({ label, type }: { label: string; type: ProductType }) {
+function Dropdown({ label, type, to }: { label: string; type: ProductType; to: string }) {
   const [roots, setRoots] = useState<Category[]>([])
 
   useEffect(() => {
@@ -34,9 +34,9 @@ function Dropdown({ label, type }: { label: string; type: ProductType }) {
 
   return (
     <div className="group relative">
-      <button className="px-3 py-2 text-sm font-medium text-slate-700 hover:text-emerald-700">
+      <Link to={to} className="block px-3 py-2 text-sm font-medium text-slate-700 hover:text-emerald-700">
         {label} ▾
-      </button>
+      </Link>
       <div className="invisible absolute left-0 top-full z-20 w-56 rounded-lg border border-slate-200 bg-white p-1 opacity-0 shadow-lg transition group-hover:visible group-hover:opacity-100">
         {roots.length === 0 ? (
           <p className="px-3 py-2 text-sm text-slate-400">Chưa có danh mục</p>
@@ -51,8 +51,8 @@ function Dropdown({ label, type }: { label: string; type: ProductType }) {
 export function CategoryMenu() {
   return (
     <nav className="flex items-center gap-1">
-      <Dropdown label="Homestay" type="HOMESTAY" />
-      <Dropdown label="Tour" type="TOUR" />
+      <Dropdown label="Homestay" type="HOMESTAY" to="/homestays" />
+      <Dropdown label="Tour" type="TOUR" to="/tours" />
     </nav>
   )
 }

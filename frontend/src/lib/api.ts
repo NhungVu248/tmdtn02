@@ -78,6 +78,35 @@ export interface Review {
   rating: number
   comment: string | null
   createdAt: string
+  images?: { id: number; url: string }[]
+}
+
+// Cẩm nang du lịch (công khai)
+export interface GuideSummary {
+  id: number
+  title: string
+  slug: string
+  authorName: string | null
+  coverImage: string | null
+  excerpt: string | null
+  locationName: string | null
+  publishedAt: string | null
+}
+export interface GuideDetail extends GuideSummary {
+  content: string
+  latitude: number | null
+  longitude: number | null
+  relatedTours: {
+    id: number
+    title: string
+    slug: string
+    thumbnail: string | null
+    basePrice: number
+    durationDays: number
+    durationNights: number
+    avgRating: number
+    reviewCount: number
+  }[]
 }
 
 export interface Departure {
@@ -331,6 +360,21 @@ export const api = {
     get<Availability>(`/api/catalog/tours/${encodeURIComponent(slug)}/availability?${params.toString()}`),
   getInfoList: () => get<{ articles: InfoSummary[] }>('/api/info'),
   getInfoArticle: (slug: string) => get<{ article: InfoArticle }>(`/api/info/${encodeURIComponent(slug)}`),
+  // Cẩm nang du lịch (công khai)
+  getGuides: (search?: string) => get<{ items: GuideSummary[] }>(`/api/guides${search ? `?search=${encodeURIComponent(search)}` : ''}`),
+  getGuide: (slug: string) => get<{ guide: GuideDetail }>(`/api/guides/${encodeURIComponent(slug)}`),
+  // UC-15 – Tải ảnh đính kèm đánh giá (tối đa 6). Trả về danh sách URL công khai.
+  uploadReviewImages: async (files: File[]) => {
+    const form = new FormData()
+    files.slice(0, 6).forEach((f) => form.append('files', f))
+    const res = await fetch(`${API_URL}/api/reviews/upload`, { method: 'POST', body: form })
+    if (!res.ok) {
+      let message = 'Tải ảnh thất bại'
+      try { const b = await res.json(); if (b?.message) message = b.message } catch { /* giữ mặc định */ }
+      throw new ApiError(res.status, message)
+    }
+    return res.json() as Promise<{ images: string[] }>
+  },
   register: (body: {
     email: string
     password: string
@@ -414,9 +458,9 @@ export const api = {
     get<{ productName: string; productSlug: string; thumbnail: string | null; bookingCode: string }>(
       `/api/reviews/token/${encodeURIComponent(token)}`,
     ),
-  submitGuestReview: (data: { token: string; rating: number; comment?: string }) =>
+  submitGuestReview: (data: { token: string; rating: number; comment?: string; images?: string[] }) =>
     post<{ message: string }>('/api/reviews/guest', data),
-  submitMyReview: (data: { code: string; rating: number; comment?: string }) =>
+  submitMyReview: (data: { code: string; rating: number; comment?: string; images?: string[] }) =>
     post<{ message: string }>('/api/reviews/my', data),
 }
 

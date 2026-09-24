@@ -4,6 +4,7 @@ import {
   closeDeparture,
   createDeparture,
   createTour,
+  createTourCategory,
   getTour,
   listTours,
   removeImage,
@@ -25,6 +26,7 @@ router.use(requireAdmin)
 router.post('/uploads/image', uploadImage.single('file'), uploadFile)
 // Danh mục region/theme/duration + chính sách hủy cho form tour.
 router.get('/categories', tourCategories)
+router.post('/categories', createTourCategory)
 
 router.get('/', listTours)
 router.post('/', createTour)

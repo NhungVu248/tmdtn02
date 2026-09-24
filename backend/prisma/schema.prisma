@@ -96,6 +96,7 @@ model Admin {
   auditLogs     AdminAuditLog[]
   tours         Tour[]
   properties    Property[]
+  travelGuides  TravelGuide[]
 
   @@index([role])
 }
@@ -470,6 +471,8 @@ model Review {
   rejected    Boolean     @default(false) // UC-21/BR-104: từ chối/ẩn — phân biệt với "chờ kiểm duyệt" (cả 2 đều approved=false)
   createdAt   DateTime    @default(now())
 
+  images      ReviewImage[] // UC-15: ảnh đính kèm theo đánh giá
+
   @@index([productId])
   @@index([propertyId])
   @@index([tourId])
@@ -573,6 +576,7 @@ model Tour {
   favorites   Favorite[]
   bookings    Booking[]
   discountCodes DiscountCode[]
+  guides      TravelGuideTour[] // cẩm nang du lịch liên quan
 
   @@index([status])
   @@index([regionId])
@@ -851,4 +855,57 @@ model Promotion {
   createdAt   DateTime @default(now())
 
   @@index([active])
+}
+
+// UC-15 – Ảnh đính kèm theo đánh giá (mỗi đánh giá có thể nhiều ảnh).
+model ReviewImage {
+  id        Int      @id @default(autoincrement())
+  reviewId  Int
+  review    Review   @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  url       String
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+
+  @@index([reviewId])
+}
+
+// Cẩm nang du lịch (blog): tác giả, ảnh bìa, ngày đăng, địa điểm (bản đồ), tour liên quan.
+enum GuideStatus {
+  DRAFT
+  VISIBLE
+  HIDDEN
+}
+
+model TravelGuide {
+  id           Int         @id @default(autoincrement())
+  title        String
+  slug         String      @unique
+  authorName   String? // tên tác giả
+  coverImage   String? // ảnh bìa
+  excerpt      String?     @db.Text // tóm tắt ngắn
+  content      String      @db.Text // nội dung (nhiều đoạn)
+  locationName String? // tên địa điểm
+  latitude     Float? // vĩ độ (bản đồ)
+  longitude    Float? // kinh độ (bản đồ)
+  publishedAt  DateTime? // ngày đăng
+  status       GuideStatus @default(DRAFT)
+  createdById  Int?
+  createdBy    Admin?      @relation(fields: [createdById], references: [id])
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  relatedTours TravelGuideTour[]
+
+  @@index([status])
+  @@index([publishedAt])
+}
+
+model TravelGuideTour {
+  guideId Int
+  guide   TravelGuide @relation(fields: [guideId], references: [id], onDelete: Cascade)
+  tourId  Int
+  tour    Tour        @relation(fields: [tourId], references: [id], onDelete: Cascade)
+
+  @@id([guideId, tourId])
+  @@index([tourId])
 }
