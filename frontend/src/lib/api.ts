@@ -393,8 +393,16 @@ export const api = {
   resetPassword: (token: string, password: string) =>
     post<{ message: string }>('/api/auth/reset-password', { token, password }),
   getMe: () => get<{ user: AuthUser }>('/api/auth/me'),
-  updateProfile: (data: { name?: string; phone?: string; address?: string }) =>
-    put<{ user: AuthUser }>('/api/auth/profile', data),
+  updateProfile: (data: {
+    name?: string
+    phone?: string
+    address?: string
+    dateOfBirth?: string | null
+    gender?: string
+    nationality?: string
+    idNumber?: string
+    city?: string
+  }) => put<{ user: AuthUser }>('/api/auth/profile', data),
   changePassword: (currentPassword: string, newPassword: string) =>
     put<{ message: string }>('/api/auth/password', { currentPassword, newPassword }),
   getFavorites: () => get<{ items: Product[] }>('/api/favorites'),
@@ -538,6 +546,11 @@ export interface AuthUser {
   name: string | null
   phone?: string | null
   address?: string | null
+  dateOfBirth?: string | null
+  gender?: string | null
+  nationality?: string | null
+  idNumber?: string | null
+  city?: string | null
   avatar?: string | null
   emailVerified: boolean
 }

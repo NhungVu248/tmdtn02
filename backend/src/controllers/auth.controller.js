@@ -27,9 +27,16 @@ const publicUser = (u) => ({
   name: u.name,
   phone: u.phone,
   address: u.address,
+  dateOfBirth: u.dateOfBirth,
+  gender: u.gender,
+  nationality: u.nationality,
+  idNumber: u.idNumber,
+  city: u.city,
   avatar: u.avatar,
   emailVerified: u.emailVerified,
 })
+
+const GENDERS = ['MALE', 'FEMALE', 'OTHER']
 
 const PHONE_RE = /^[0-9+\-\s().]{8,15}$/
 
@@ -381,6 +388,11 @@ export async function me(req, res, next) {
         name: true,
         phone: true,
         address: true,
+        dateOfBirth: true,
+        gender: true,
+        nationality: true,
+        idNumber: true,
+        city: true,
         avatar: true,
         emailVerified: true,
         createdAt: true,
@@ -398,16 +410,39 @@ export async function me(req, res, next) {
 // UC-07 – Cập nhật hồ sơ cá nhân (BR-20: chỉ chủ tài khoản đã đăng nhập).
 export async function updateProfile(req, res, next) {
   try {
-    const { name, phone, address } = req.body
+    const { name, phone, address, dateOfBirth, gender, nationality, idNumber, city } = req.body
 
     if (phone && !PHONE_RE.test(phone)) {
       return res.status(400).json({ message: 'Số điện thoại không hợp lệ (8–15 chữ số)' }) // 3a
+    }
+    if (gender && !GENDERS.includes(gender)) {
+      return res.status(400).json({ message: 'Giới tính không hợp lệ' })
+    }
+    let dob
+    if (dateOfBirth !== undefined) {
+      if (!dateOfBirth) {
+        dob = null
+      } else {
+        const d = new Date(dateOfBirth)
+        if (Number.isNaN(d.getTime())) {
+          return res.status(400).json({ message: 'Ngày sinh không hợp lệ' })
+        }
+        if (d.getTime() > Date.now()) {
+          return res.status(400).json({ message: 'Ngày sinh không thể ở tương lai' })
+        }
+        dob = d
+      }
     }
 
     const data = {}
     if (name !== undefined) data.name = name || null
     if (phone !== undefined) data.phone = phone || null
     if (address !== undefined) data.address = address || null
+    if (dateOfBirth !== undefined) data.dateOfBirth = dob
+    if (gender !== undefined) data.gender = gender || null
+    if (nationality !== undefined) data.nationality = nationality || null
+    if (idNumber !== undefined) data.idNumber = idNumber || null
+    if (city !== undefined) data.city = city || null
 
     const user = await prisma.user.update({ where: { id: req.user.sub }, data })
     res.json({ user: publicUser(user) })

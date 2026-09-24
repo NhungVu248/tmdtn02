@@ -158,6 +158,11 @@ model User {
   name          String?
   phone         String? // UC-07: số điện thoại
   address       String? // UC-07: thông tin liên hệ/địa chỉ
+  dateOfBirth   DateTime? // ngày sinh (phục vụ vận hành đặt phòng/tour)
+  gender        String? // giới tính: MALE / FEMALE / OTHER
+  nationality   String? // quốc tịch
+  idNumber      String? // số CCCD/CMND hoặc hộ chiếu (định danh khách khi nhận phòng)
+  city          String? // tỉnh/thành cư trú
   avatar        String? // ảnh đại diện từ Google (nếu có)
   googleId      String?  @unique // liên kết tài khoản Google (UC-05 1a / UC-06 1b)
   emailVerified Boolean  @default(false) // BR-15: kích hoạt sau khi xác thực email
