@@ -23,6 +23,9 @@ export function ProductDetailPage() {
   const [from, setFrom] = useState(todayPlus(1))
   const [to, setTo] = useState(todayPlus(3))
   const [guests, setGuests] = useState(2)
+  // Tồn phòng theo từng loại phòng cho khoảng ngày đã chọn: roomTypeId -> số phòng còn trống.
+  const [roomsLeft, setRoomsLeft] = useState<Record<number, number>>({})
+  const [availLoading, setAvailLoading] = useState(false)
 
   useEffect(() => {
     if (!slug) return
@@ -36,6 +39,39 @@ export function ProductDetailPage() {
       })
       .catch((err) => setStatus(err instanceof ApiError && err.status === 404 ? 'gone' : 'error'))
   }, [slug])
+
+  // Kiểm tra tồn phòng cho mỗi loại phòng khi đổi ngày.
+  useEffect(() => {
+    const types = data?.property.roomTypes
+    if (!slug || !types || types.length === 0) return
+    const nightsN = Math.max(0, Math.round((new Date(to).getTime() - new Date(from).getTime()) / 86400000))
+    if (nightsN <= 0) {
+      setRoomsLeft({})
+      return
+    }
+    let cancelled = false
+    setAvailLoading(true)
+    Promise.all(
+      types.map((r) => {
+        const qs = new URLSearchParams({ from, to, roomTypeId: String(r.id) })
+        return api
+          .checkAvailability(slug, qs)
+          .then((a) => [r.id, a.available ? a.roomsLeft ?? 0 : 0] as const)
+          .catch(() => [r.id, 0] as const)
+      }),
+    ).then((pairs) => {
+      if (cancelled) return
+      const map = Object.fromEntries(pairs)
+      setRoomsLeft(map)
+      setAvailLoading(false)
+      // Nếu loại phòng đang chọn đã hết, tự chuyển sang loại còn trống đầu tiên.
+      const firstAvail = types.find((r) => (map[r.id] ?? 0) > 0)
+      setRtId((cur) => (cur != null && (map[cur] ?? 0) > 0 ? cur : firstAvail?.id ?? cur))
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [slug, from, to, data])
 
   const property = data?.property
   const rt = useMemo(() => property?.roomTypes.find((r) => r.id === rtId) ?? null, [property, rtId])
@@ -115,31 +151,68 @@ export function ProductDetailPage() {
           )}
 
           <Section title="Các loại phòng">
-            <div className="space-y-3">
-              {property.roomTypes.map((r) => (
-                <label key={r.id} className={`block cursor-pointer rounded-xl border p-4 ${rtId === r.id ? 'border-emerald-500 ring-1 ring-emerald-500' : 'border-slate-200'}`}>
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <input type="radio" checked={rtId === r.id} onChange={() => setRtId(r.id)} />
-                        <span className="font-semibold text-slate-800">{r.name}</span>
-                      </div>
-                      <div className="mt-1 flex flex-wrap gap-3 text-xs text-slate-500">
-                        {r.bedType && <span>🛏 {r.bedType}</span>}
-                        <span>👥 Tối đa {r.maxOccupancy} khách</span>
-                        {r.roomSize && <span>📐 {r.roomSize}m²</span>}
-                        {r.breakfastIncluded && <span className="text-emerald-600">✓ Kèm bữa sáng</span>}
-                      </div>
-                      {r.description && <p className="mt-1 text-sm text-slate-600">{r.description}</p>}
-                    </div>
-                    <div className="shrink-0 text-right">
-                      <div className="font-semibold text-emerald-600">{formatPrice(r.basePricePerNight)}</div>
-                      <div className="text-xs text-slate-400">/đêm</div>
-                    </div>
+            {(() => {
+              const hasAvail = Object.keys(roomsLeft).length > 0
+              // Khi đã có dữ liệu tồn phòng: ẩn loại phòng hết sạch (0 phòng).
+              const visible = hasAvail ? property.roomTypes.filter((r) => (roomsLeft[r.id] ?? 0) > 0) : property.roomTypes
+
+              if (availLoading && !hasAvail) {
+                return <p className="text-sm text-slate-500">Đang kiểm tra tình trạng phòng...</p>
+              }
+              if (hasAvail && visible.length === 0) {
+                return (
+                  <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-6 text-center text-sm text-amber-700">
+                    😔 Đã hết phòng cho khoảng ngày đã chọn. Vui lòng thử ngày khác.
                   </div>
-                </label>
-              ))}
-            </div>
+                )
+              }
+              return (
+                <div className="space-y-3">
+                  {visible.map((r) => {
+                    const left = roomsLeft[r.id]
+                    const selected = rtId === r.id
+                    return (
+                      <label
+                        key={r.id}
+                        className={`block cursor-pointer rounded-2xl border p-4 transition ${selected ? 'border-forest-500 ring-1 ring-forest-500 bg-forest-50/40' : 'border-cream-200 hover:border-forest-300'}`}
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <input type="radio" className="accent-forest-700" checked={selected} onChange={() => setRtId(r.id)} />
+                              <span className="font-semibold text-forest-900">{r.name}</span>
+                            </div>
+                            <div className="mt-1 flex flex-wrap gap-3 text-xs text-forest-500">
+                              {r.bedType && <span>🛏 {r.bedType}</span>}
+                              <span>👥 Tối đa {r.maxOccupancy} khách</span>
+                              {r.roomSize && <span>📐 {r.roomSize}m²</span>}
+                              {r.breakfastIncluded && <span className="text-forest-600">✓ Kèm bữa sáng</span>}
+                            </div>
+                            {r.description && <p className="mt-1 text-sm text-forest-500">{r.description}</p>}
+                            {/* Tình trạng phòng còn trống */}
+                            {left != null && (
+                              left <= 3 ? (
+                                <span className="mt-2 inline-flex items-center gap-1 rounded-full bg-clay-500/15 px-2.5 py-1 text-xs font-medium text-clay-600">
+                                  🔥 Sắp hết — chỉ còn {left} phòng!
+                                </span>
+                              ) : (
+                                <span className="mt-2 inline-flex items-center gap-1 rounded-full bg-forest-100 px-2.5 py-1 text-xs font-medium text-forest-700">
+                                  ✓ Còn {left} phòng trống
+                                </span>
+                              )
+                            )}
+                          </div>
+                          <div className="shrink-0 text-right">
+                            <div className="font-semibold text-clay-600">{formatPrice(r.basePricePerNight)}</div>
+                            <div className="text-xs text-forest-400">/đêm</div>
+                          </div>
+                        </div>
+                      </label>
+                    )
+                  })}
+                </div>
+              )
+            })()}
           </Section>
 
           {property.cancellationPolicy && (
