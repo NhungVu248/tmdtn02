@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { OrderDetailCard, StatusBadge } from '../components/OrderDetailCard'
+import { OrderDetailCard, STATUS_LABEL, StatusBadge } from '../components/OrderDetailCard'
 import { ErrorState, Loading } from '../components/StateBlocks'
 import { ApiError, api, formatPrice, type OrderDetail, type OrderSummary } from '../lib/api'
 
@@ -93,6 +93,8 @@ function OrderGroup({ icon, title, orders }: { icon: string; title: string; orde
 export function OrdersPage() {
   const [orders, setOrders] = useState<OrderSummary[]>([])
   const [status, setStatus] = useState<'loading' | 'ok' | 'error'>('loading')
+  const [statusFilter, setStatusFilter] = useState<string>('') // '' = tất cả trạng thái
+  const [sortNewest, setSortNewest] = useState(true) // true: mới nhất trước
 
   const load = useCallback(() => {
     setStatus('loading')
@@ -112,15 +114,60 @@ export function OrdersPage() {
   if (status === 'loading') return <Loading />
   if (status === 'error') return <ErrorState onRetry={load} />
 
-  const homestays = orders.filter((o) => o.type === 'HOMESTAY')
-  const tours = orders.filter((o) => o.type === 'TOUR')
+  // Các trạng thái thực sự xuất hiện trong danh sách đơn (để dựng nút lọc).
+  const presentStatuses = Object.keys(STATUS_LABEL).filter((s) => orders.some((o) => o.status === s))
+
+  // Lọc theo trạng thái rồi sắp xếp theo ngày đặt.
+  const visible = orders
+    .filter((o) => !statusFilter || o.status === statusFilter)
+    .slice()
+    .sort((a, b) => {
+      const diff = new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      return sortNewest ? diff : -diff
+    })
+
+  const homestays = visible.filter((o) => o.type === 'HOMESTAY')
+  const tours = visible.filter((o) => o.type === 'TOUR')
+
+  const chip = (active: boolean) =>
+    `rounded-full px-4 py-1.5 text-sm font-medium transition ${
+      active ? 'bg-forest-700 text-cream-50' : 'bg-white text-forest-600 ring-1 ring-cream-300 hover:bg-cream-100'
+    }`
 
   return (
     <div className="mx-auto max-w-6xl px-6 py-10">
-      <header className="mb-8">
+      <header className="mb-6">
         <h1 className="font-display text-4xl font-semibold text-forest-900">Đơn của tôi</h1>
         <p className="mt-2 text-forest-400">Theo dõi các đơn đặt homestay và tour của bạn tại một nơi.</p>
       </header>
+
+      {orders.length > 0 && (
+        <div className="mb-8 flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-cream-200 bg-white px-5 py-3">
+          {/* Bộ lọc trạng thái */}
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="mr-1 text-sm text-forest-400">Trạng thái:</span>
+            <button onClick={() => setStatusFilter('')} className={chip(statusFilter === '')}>
+              Tất cả
+            </button>
+            {presentStatuses.map((s) => (
+              <button key={s} onClick={() => setStatusFilter(s)} className={chip(statusFilter === s)}>
+                {STATUS_LABEL[s]}
+              </button>
+            ))}
+          </div>
+
+          {/* Sắp xếp theo ngày đặt */}
+          <div className="flex items-center gap-2 text-sm">
+            <span className="text-forest-400">Ngày đặt:</span>
+            <button onClick={() => setSortNewest(true)} className={chip(sortNewest)}>
+              Mới nhất
+            </button>
+            <button onClick={() => setSortNewest(false)} className={chip(!sortNewest)}>
+              Cũ nhất
+            </button>
+          </div>
+        </div>
+      )}
 
       {orders.length === 0 ? (
         <div className="flex flex-col items-center justify-center rounded-3xl border border-cream-200 bg-white py-20 text-center">
