@@ -1,4 +1,4 @@
-import { Link, Outlet, useNavigate } from 'react-router-dom'
+import { NavLink, Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useAdminAuth } from '../lib/adminAuth'
 
 const ROLE_LABEL: Record<string, string> = {
@@ -6,48 +6,121 @@ const ROLE_LABEL: Record<string, string> = {
   MANAGER: 'Quản lý',
 }
 
-// UC-24 – Khung giao diện khu vực quản trị (/admin), hoàn toàn tách biệt với Layout Customer.
+// Cấu trúc menu quản trị theo nhóm chức năng.
+const NAV_GROUPS: { title: string; items: { to: string; label: string; icon: string; end?: boolean }[] }[] = [
+  {
+    title: 'Tổng quan',
+    items: [{ to: '/admin', label: 'Bảng điều khiển', icon: '▦', end: true }],
+  },
+  {
+    title: 'Kinh doanh',
+    items: [
+      { to: '/admin/homestays', label: 'Homestay', icon: '⌂' },
+      { to: '/admin/tours', label: 'Tour', icon: '✈' },
+      { to: '/admin/guides', label: 'Cẩm nang du lịch', icon: '❏' },
+      { to: '/admin/orders', label: 'Đơn hàng', icon: '🧾' },
+      { to: '/admin/discounts', label: 'Mã khuyến mại', icon: '％' },
+    ],
+  },
+  {
+    title: 'Vận hành',
+    items: [
+      { to: '/admin/reviews', label: 'Kiểm duyệt đánh giá', icon: '★' },
+      { to: '/admin/reports', label: 'Báo cáo & thống kê', icon: '📊' },
+      { to: '/admin/users', label: 'Người dùng', icon: '☺' },
+      { to: '/admin/settings', label: 'Cấu hình hệ thống', icon: '⚙' },
+    ],
+  },
+]
+
+// Nhãn tiêu đề trang theo đường dẫn hiện tại.
+const TITLES: { prefix: string; label: string }[] = [
+  { prefix: '/admin/homestays', label: 'Quản lý Homestay' },
+  { prefix: '/admin/tours', label: 'Quản lý Tour' },
+  { prefix: '/admin/guides', label: 'Cẩm nang du lịch' },
+  { prefix: '/admin/orders', label: 'Quản lý đơn hàng' },
+  { prefix: '/admin/discounts', label: 'Mã khuyến mại' },
+  { prefix: '/admin/reviews', label: 'Kiểm duyệt đánh giá' },
+  { prefix: '/admin/reports', label: 'Báo cáo & thống kê' },
+  { prefix: '/admin/users', label: 'Quản lý người dùng' },
+  { prefix: '/admin/settings', label: 'Cấu hình hệ thống' },
+]
+
 export function AdminLayout() {
   const { admin, logout } = useAdminAuth()
   const navigate = useNavigate()
+  const { pathname } = useLocation()
+
+  const pageTitle = TITLES.find((t) => pathname.startsWith(t.prefix))?.label ?? 'Bảng điều khiển'
+  const initials = (admin?.name || admin?.username || 'A').charAt(0).toUpperCase()
 
   return (
-    <div className="min-h-screen bg-slate-900 text-slate-100">
+    <div className="min-h-screen bg-slate-950 text-slate-100">
       <div className="flex">
-        <aside className="hidden w-56 shrink-0 border-r border-slate-800 bg-slate-950 p-4 lg:block">
-          <Link to="/admin" className="mb-6 block text-lg font-bold text-white">
-            🛠️ StayTour Admin
+        {/* ── Sidebar ── */}
+        <aside className="fixed inset-y-0 left-0 hidden w-64 flex-col border-r border-slate-800 bg-slate-900 lg:flex">
+          <Link to="/admin" className="flex items-center gap-2.5 border-b border-slate-800 px-6 py-5">
+            <span className="grid h-9 w-9 place-items-center rounded-lg bg-emerald-500 text-base font-bold text-slate-900">S</span>
+            <span className="text-lg font-semibold text-white">StayTour <span className="text-emerald-400">Admin</span></span>
           </Link>
-          <nav className="space-y-1 text-sm">
-            <NavItem to="/admin">Tổng quan</NavItem>
-            <NavItem to="/admin/homestays">Homestay (UC-16)</NavItem>
-            <NavItem to="/admin/tours">Tour (UC-17)</NavItem>
-            <NavItem to="/admin/guides">Cẩm nang du lịch</NavItem>
-            <NavItem to="/admin/orders">Đơn hàng (UC-18)</NavItem>
-            <NavItem to="/admin/users">Người dùng (UC-19)</NavItem>
-            <NavItem to="/admin/discounts">Mã khuyến mại (UC-20)</NavItem>
-            <NavItem to="/admin/reviews">Kiểm duyệt đánh giá (UC-21)</NavItem>
-            <NavItem to="/admin/reports">Báo cáo (UC-22)</NavItem>
-            <NavItem to="/admin/settings">Cấu hình (UC-23)</NavItem>
+
+          <nav className="flex-1 space-y-6 overflow-y-auto px-3 py-5">
+            {NAV_GROUPS.map((group) => (
+              <div key={group.title}>
+                <p className="px-3 pb-2 text-[11px] font-semibold uppercase tracking-wider text-slate-500">{group.title}</p>
+                <div className="space-y-1">
+                  {group.items.map((item) => (
+                    <NavLink
+                      key={item.to}
+                      to={item.to}
+                      end={item.end}
+                      className={({ isActive }) =>
+                        `flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition ${
+                          isActive
+                            ? 'bg-emerald-500/15 text-emerald-300 shadow-[inset_2px_0_0_0] shadow-emerald-400'
+                            : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                        }`
+                      }
+                    >
+                      <span className="w-5 text-center text-base">{item.icon}</span>
+                      {item.label}
+                    </NavLink>
+                  ))}
+                </div>
+              </div>
+            ))}
           </nav>
+
+          <div className="border-t border-slate-800 p-3">
+            <Link to="/" className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-slate-400 transition hover:bg-slate-800 hover:text-white">
+              <span className="w-5 text-center">↩</span> Về trang khách hàng
+            </Link>
+          </div>
         </aside>
 
-        <div className="min-h-screen flex-1">
-          <header className="flex items-center justify-between border-b border-slate-800 bg-slate-900 px-4 py-3">
-            <span className="text-sm text-slate-400">Khu vực quản trị</span>
-            <div className="flex items-center gap-3 text-sm">
-              <span className="text-slate-300">
-                {admin?.name || admin?.username}{' '}
-                <span className="rounded-full bg-slate-800 px-2 py-0.5 text-xs text-slate-400">
-                  {admin ? ROLE_LABEL[admin.role] : ''}
+        {/* ── Nội dung ── */}
+        <div className="min-h-screen flex-1 lg:ml-64">
+          <header className="sticky top-0 z-20 flex items-center justify-between border-b border-slate-800 bg-slate-900/80 px-6 py-3.5 backdrop-blur">
+            <div>
+              <h1 className="text-lg font-semibold text-white">{pageTitle}</h1>
+              <p className="text-xs text-slate-500">Khu vực quản trị</p>
+            </div>
+            <div className="flex items-center gap-4">
+              <div className="hidden items-center gap-2.5 sm:flex">
+                <span className="grid h-9 w-9 place-items-center rounded-full bg-emerald-500/20 text-sm font-semibold text-emerald-300">
+                  {initials}
                 </span>
-              </span>
+                <div className="leading-tight">
+                  <p className="text-sm font-medium text-slate-100">{admin?.name || admin?.username}</p>
+                  <p className="text-xs text-slate-500">{admin ? ROLE_LABEL[admin.role] : ''}</p>
+                </div>
+              </div>
               <button
                 onClick={() => {
                   logout()
                   navigate('/admin/login')
                 }}
-                className="rounded-lg border border-slate-700 px-3 py-1.5 font-medium hover:bg-slate-800"
+                className="rounded-lg border border-slate-700 px-3.5 py-1.5 text-sm font-medium text-slate-300 transition hover:bg-slate-800"
               >
                 Đăng xuất
               </button>
@@ -59,20 +132,5 @@ export function AdminLayout() {
         </div>
       </div>
     </div>
-  )
-}
-
-function NavItem({ to, disabled, children }: { to: string; disabled?: boolean; children: React.ReactNode }) {
-  if (disabled) {
-    return (
-      <span className="block cursor-not-allowed rounded-lg px-3 py-2 text-slate-600" title="Sẽ hoàn thiện ở UC tương ứng">
-        {children}
-      </span>
-    )
-  }
-  return (
-    <Link to={to} className="block rounded-lg px-3 py-2 text-slate-300 hover:bg-slate-800 hover:text-white">
-      {children}
-    </Link>
   )
 }

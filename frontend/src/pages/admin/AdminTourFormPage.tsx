@@ -192,7 +192,7 @@ export function AdminTourFormPage() {
           <legend className="mb-2 font-semibold text-slate-200">Giá & chính sách</legend>
           <div className="grid grid-cols-3 gap-4">
             <div><label className={label}>Giá tham khảo (VNĐ) *</label><input className={field} type="number" min={0} value={f.basePrice} onChange={(e) => set('basePrice', e.target.value)} required /></div>
-            <div><label className={label}>Tỷ lệ cọc (%)</label><input className={field} type="number" min={1} max={100} value={f.depositRate} onChange={(e) => set('depositRate', e.target.value)} placeholder="Mặc định UC-23" /></div>
+            <div><label className={label}>Tỷ lệ cọc (%)</label><input className={field} type="number" min={1} max={100} value={f.depositRate} onChange={(e) => set('depositRate', e.target.value)} placeholder="Theo cấu hình hệ thống" /></div>
             <div><label className={label}>Chính sách hủy</label>
               <select className={field} value={f.cancellationPolicyId} onChange={(e) => set('cancellationPolicyId', e.target.value)}>
                 <option value="">— Mặc định —</option>

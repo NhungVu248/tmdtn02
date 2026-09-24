@@ -98,7 +98,7 @@ export function AdminHomestayCalendarPage() {
             {conflict && conflict.bookings.length > 0 && (
               <ul className="mt-2 list-disc pl-5 text-xs">
                 {conflict.bookings.map((b) => (
-                  <li key={b.code}>Đơn <span className="font-mono">{b.code}</span> ({new Date(b.checkIn).toLocaleDateString('vi-VN')} → {new Date(b.checkOut).toLocaleDateString('vi-VN')}) — xử lý ở Quản lý đơn (UC-18) trước.</li>
+                  <li key={b.code}>Đơn <span className="font-mono">{b.code}</span> ({new Date(b.checkIn).toLocaleDateString('vi-VN')} → {new Date(b.checkOut).toLocaleDateString('vi-VN')}) — xử lý ở Quản lý đơn hàng trước.</li>
                 ))}
               </ul>
             )}

@@ -176,7 +176,7 @@ export function AdminOrderDetailPage() {
 
       {refunds.length > 0 && (
         <div className="rounded-xl border border-slate-800 bg-slate-950 p-5">
-          <h2 className="mb-3 font-semibold text-slate-200">Yêu cầu hoàn tiền (UC-14 → UC-18)</h2>
+          <h2 className="mb-3 font-semibold text-slate-200">Yêu cầu hoàn tiền</h2>
           <div className="space-y-3">
             {refunds.map((r) => (
               <div key={r.id} className="rounded-lg border border-slate-800 p-3">

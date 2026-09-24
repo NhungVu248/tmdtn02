@@ -133,7 +133,7 @@ export function AdminTourDeparturesPage() {
           {conflict && conflict.length > 0 && (
             <ul className="mt-2 list-disc pl-5 text-xs">
               {conflict.map((b) => (
-                <li key={b.code}>Đơn <span className="font-mono">{b.code}</span> ({b.guests} người lớn{b.children ? ` · ${b.children} trẻ em` : ''}) — xử lý ở Quản lý đơn (UC-18) trước.</li>
+                <li key={b.code}>Đơn <span className="font-mono">{b.code}</span> ({b.guests} người lớn{b.children ? ` · ${b.children} trẻ em` : ''}) — xử lý ở Quản lý đơn hàng trước.</li>
               ))}
             </ul>
           )}
