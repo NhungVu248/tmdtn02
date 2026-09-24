@@ -21,6 +21,7 @@ export function BookingPage() {
   const date = params.get('date') || ''
   const guests = Number(params.get('guests')) || 2
   const children = Number(params.get('children')) || 0
+  const roomTypeId = Number(params.get('roomTypeId')) || 0
   const { user } = useAuth()
 
   const [detail, setDetail] = useState<DetailResponse | null>(null)
@@ -49,15 +50,88 @@ export function BookingPage() {
 
   useEffect(() => {
     if (!slug) return
-    Promise.all([api.getProductDetail(slug), api.getBookingConfig(), api.getPaymentConfig()])
-      .then(([d, cfg, pay]) => {
-        setDetail(d)
+    Promise.all([api.getBookingConfig(), api.getPaymentConfig()])
+      .then(async ([cfg, pay]) => {
         setDepositRate(cfg.depositRate)
         setVnpayEnabled(pay.vnpayEnabled)
+        // Homestay (Property) hay Tour (bảng riêng)? Thử homestay trước, 404 -> tour.
+        try {
+          const pd = await api.getPropertyDetail(slug)
+          const rt = roomTypeId ? pd.property.roomTypes.find((r) => r.id === roomTypeId) : pd.property.roomTypes[0]
+          const policyText = pd.property.cancellationPolicy
+            ? [
+                pd.property.cancellationPolicy.freeHours > 0 ? `Miễn phí hủy trong ${pd.property.cancellationPolicy.freeHours} giờ đầu.` : '',
+                ...pd.property.cancellationPolicy.milestones.map((m) => `Hủy trước ≥ ${m.daysBefore} ngày: hoàn ${m.refundRate}%.`),
+                'Hủy sát ngày hơn: không hoàn tiền.',
+              ].filter(Boolean).join(' ')
+            : ''
+          if (pd.property.depositRate != null) setDepositRate(pd.property.depositRate / 100)
+          setDetail({
+            product: {
+              id: pd.property.id,
+              name: pd.property.name,
+              slug: pd.property.slug,
+              type: 'HOMESTAY',
+              location: pd.property.address,
+              price: rt?.basePricePerNight ?? pd.property.basePrice,
+              priceChild: null,
+              rating: pd.property.avgRating,
+              thumbnail: pd.property.thumbnail,
+              isFeatured: false,
+              categoryId: null,
+              description: pd.property.description,
+              cancellationPolicy: policyText,
+              itinerary: null,
+              images: [],
+              category: null,
+              departures: [],
+            } as unknown as DetailResponse['product'],
+            reviews: [],
+            similar: [],
+          })
+        } catch {
+          // Tour: dựng product-shape tương thích từ chuyến khớp `date` + giá theo loại khách.
+          const td = await api.getTourDetail(slug)
+          const dep = td.tour.departures.find((x) => x.departureDate.slice(0, 10) === date) ?? td.tour.departures[0]
+          const priceOf = (t: 'ADULT' | 'CHILD') => dep?.prices.find((p) => p.paxType === t)?.price ?? td.tour.basePrice
+          const policyText = td.tour.cancellationPolicy
+            ? [
+                td.tour.cancellationPolicy.freeHours > 0 ? `Miễn phí hủy trong ${td.tour.cancellationPolicy.freeHours} giờ đầu.` : '',
+                ...td.tour.cancellationPolicy.milestones.map((m) => `Hủy trước ≥ ${m.daysBefore} ngày: hoàn ${m.refundRate}%.`),
+                'Hủy sát ngày hơn: không hoàn tiền.',
+              ]
+                .filter(Boolean)
+                .join(' ')
+            : ''
+          if (td.tour.depositRate != null) setDepositRate(td.tour.depositRate / 100)
+          setDetail({
+            product: {
+              id: td.tour.id,
+              name: td.tour.title,
+              slug: td.tour.slug,
+              type: 'TOUR',
+              location: td.tour.destination,
+              price: priceOf('ADULT'),
+              priceChild: priceOf('CHILD'),
+              rating: td.tour.avgRating,
+              thumbnail: td.tour.thumbnail,
+              isFeatured: false,
+              categoryId: null,
+              description: td.tour.description,
+              cancellationPolicy: policyText,
+              itinerary: null,
+              images: [],
+              category: null,
+              departures: [],
+            } as unknown as DetailResponse['product'],
+            reviews: [],
+            similar: [],
+          })
+        }
         setStatus('ok')
       })
       .catch(() => setStatus('error'))
-  }, [slug])
+  }, [slug, date, roomTypeId])
 
   useEffect(() => {
     if (user) {
@@ -133,7 +207,7 @@ export function BookingPage() {
       }
       const r = isTour
         ? await api.createTourBooking({ slug: slug!, date, guests, children, ...contact })
-        : await api.createHomestayBooking({ slug: slug!, checkIn: from, checkOut: to, guests, ...contact })
+        : await api.createHomestayBooking({ slug: slug!, checkIn: from, checkOut: to, guests, roomTypeId: roomTypeId || undefined, ...contact })
       setResult(r)
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Đặt chỗ thất bại. Vui lòng thử lại.')
@@ -257,8 +331,8 @@ export function BookingPage() {
         <p className="mt-2 text-slate-500">
           Vui lòng chọn {isTour ? 'ngày khởi hành' : 'khoảng ngày'} ở trang chi tiết trước khi đặt.
         </p>
-        <Link to={`/product/${slug}`} className="mt-6 inline-block rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700">
-          ← Về trang sản phẩm
+        <Link to={isTour ? `/tour/${slug}` : `/product/${slug}`} className="mt-6 inline-block rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700">
+          ← Về trang {isTour ? 'tour' : 'sản phẩm'}
         </Link>
       </div>
     )

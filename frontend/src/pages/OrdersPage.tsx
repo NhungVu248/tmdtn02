@@ -56,6 +56,10 @@ export function OrdersPage() {
               <div className="shrink-0 text-right">
                 <StatusBadge status={o.status} />
                 <p className="mt-1 text-sm font-semibold text-slate-700">{formatPrice(o.totalPrice)}</p>
+                {/* UC-15: đơn đã hoàn tất -> gợi ý viết đánh giá ngay trên danh sách */}
+                {o.status === 'COMPLETED' && (
+                  <span className="mt-1 inline-block rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">★ Viết đánh giá</span>
+                )}
               </div>
             </Link>
           ))}

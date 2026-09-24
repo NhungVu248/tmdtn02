@@ -1,11 +1,9 @@
 import { prisma } from '../../lib/prisma.js'
 import { logAdminAction } from '../../lib/auditLog.js'
 import { publicUploadUrl } from '../../lib/uploads.js'
-import { nightsBetween, parseUtcDate } from '../../lib/booking.js'
+import { nightsBetween } from '../../lib/booking.js'
 
 const ACTIVE_STATUSES = ['PENDING_DEPOSIT', 'DEPOSITED', 'CONFIRMED']
-// Lưu ý: 'slug' KHÔNG bắt buộc — tự sinh từ 'name' nếu bỏ trống (xem createHomestay).
-const REQUIRED_FIELDS = ['name', 'location', 'price']
 
 function slugify(s) {
   return String(s)
@@ -16,27 +14,23 @@ function slugify(s) {
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/(^-|-$)/g, '')
 }
+const num = (v, def = null) => (v != null && v !== '' ? Number(v) : def)
+const str = (v) => (v != null && String(v).trim() !== '' ? String(v).trim() : null)
 
-// UC-16 – Danh sách homestay (mọi trạng thái, kể cả đã ẩn) cho khu vực quản trị.
+// UC-16 – Danh sách chỗ nghỉ (mọi trạng thái) cho khu vực quản trị.
 export async function listHomestays(req, res, next) {
   try {
     const { status, search } = req.query
-    const where = { type: 'HOMESTAY' }
-    if (status === 'VISIBLE' || status === 'HIDDEN') where.status = status
+    const where = {}
+    if (['DRAFT', 'VISIBLE', 'HIDDEN'].includes(status)) where.status = status
     if (search) where.name = { contains: String(search) }
-
-    const items = await prisma.product.findMany({
+    const items = await prisma.property.findMany({
       where,
       select: {
-        id: true,
-        name: true,
-        slug: true,
-        status: true,
-        location: true,
-        price: true,
-        thumbnail: true,
-        categoryId: true,
-        category: { select: { name: true } },
+        id: true, name: true, slug: true, propertyCode: true, propertyType: true, status: true,
+        address: true, basePrice: true, thumbnail: true, starRating: true,
+        province: { select: { name: true } }, area: { select: { name: true } },
+        _count: { select: { roomTypes: true } },
         updatedAt: true,
       },
       orderBy: { updatedAt: 'desc' },
@@ -47,180 +41,189 @@ export async function listHomestays(req, res, next) {
   }
 }
 
-// UC-16 – Chi tiết một homestay (đầy đủ trường để chỉnh sửa).
+// UC-16 – Chi tiết chỗ nghỉ (đầy đủ để chỉnh sửa).
 export async function getHomestay(req, res, next) {
   try {
     const id = Number(req.params.id)
-    const product = await prisma.product.findUnique({
+    const property = await prisma.property.findUnique({
       where: { id },
-      include: { images: { orderBy: { order: 'asc' } }, category: true },
+      include: {
+        images: { orderBy: { sortOrder: 'asc' } },
+        province: true, area: true, cancellationPolicy: true,
+        amenities: { include: { amenity: true } },
+        policies: { orderBy: { sortOrder: 'asc' } },
+        roomTypes: { include: { _count: { select: { inventory: true } } } },
+      },
     })
-    if (!product || product.type !== 'HOMESTAY') {
-      return res.status(404).json({ message: 'Không tìm thấy homestay' })
-    }
-    res.json({ product })
+    if (!property) return res.status(404).json({ message: 'Không tìm thấy chỗ nghỉ' })
+    res.json({ property })
   } catch (err) {
     next(err)
   }
 }
 
-function validatePayload(body) {
-  for (const f of REQUIRED_FIELDS) {
-    if (body[f] === undefined || body[f] === null || String(body[f]).trim() === '') {
-      return `Thiếu trường bắt buộc: ${f}` // 5a
-    }
+// Danh mục + tiện nghi + chính sách cho form.
+export async function homestayMeta(req, res, next) {
+  try {
+    const cats = await prisma.category.findMany({ where: { type: 'HOMESTAY' }, orderBy: [{ order: 'asc' }, { name: 'asc' }] })
+    res.json({
+      provinces: cats.filter((c) => c.kind === 'province'),
+      areas: cats.filter((c) => c.kind === 'area'),
+      amenities: await prisma.amenity.findMany({ orderBy: { name: 'asc' } }),
+      policies: await prisma.cancellationPolicy.findMany({ orderBy: { id: 'asc' } }),
+    })
+  } catch (err) {
+    next(err)
   }
-  if (Number.isNaN(Number(body.price)) || Number(body.price) < 0) {
-    return 'Giá cơ bản không hợp lệ'
+}
+
+function scalarData(body) {
+  return {
+    name: str(body.name),
+    propertyType: ['HOMESTAY', 'HOTEL', 'VILLA', 'APARTMENT', 'RESORT'].includes(body.propertyType) ? body.propertyType : 'HOMESTAY',
+    starRating: num(body.starRating),
+    shortDescription: str(body.shortDescription),
+    description: str(body.description),
+    provinceId: num(body.provinceId),
+    areaId: num(body.areaId),
+    address: str(body.address),
+    latitude: num(body.latitude),
+    longitude: num(body.longitude),
+    checkInTime: str(body.checkInTime),
+    checkOutTime: str(body.checkOutTime),
+    basePrice: Number(body.basePrice),
+    depositRate: num(body.depositRate),
+    cancellationPolicyId: num(body.cancellationPolicyId),
+    contactPhone: str(body.contactPhone),
+    contactEmail: str(body.contactEmail),
+    metaTitle: str(body.metaTitle) || str(body.name),
+    metaDescription: str(body.metaDescription) || str(body.shortDescription),
   }
-  if (body.categoryId != null && Number.isNaN(Number(body.categoryId))) {
-    return 'Danh mục không hợp lệ'
-  }
+}
+
+function validate(body) {
+  if (!str(body.name)) return 'Thiếu tên chỗ nghỉ' // 5a
+  if (body.basePrice == null || Number.isNaN(Number(body.basePrice)) || Number(body.basePrice) < 0) return 'Giá tham khảo không hợp lệ'
+  if (body.depositRate != null && body.depositRate !== '' && (Number(body.depositRate) < 1 || Number(body.depositRate) > 100)) return 'Tỷ lệ cọc phải từ 1 đến 100'
   return null
 }
 
-// UC-16 – Tạo homestay mới.
+async function replaceAmenitiesAndPolicies(tx, propertyId, body) {
+  if (Array.isArray(body.amenityIds)) {
+    await tx.propertyAmenity.deleteMany({ where: { propertyId } })
+    for (const aid of body.amenityIds) {
+      if (Number.isInteger(Number(aid))) await tx.propertyAmenity.create({ data: { propertyId, amenityId: Number(aid) } }).catch(() => {})
+    }
+  }
+  if (Array.isArray(body.policies)) {
+    await tx.propertyPolicy.deleteMany({ where: { propertyId } })
+    for (let i = 0; i < body.policies.length; i++) {
+      const p = body.policies[i]
+      if (str(p.content)) {
+        await tx.propertyPolicy.create({
+          data: { propertyId, type: ['HOUSE_RULE', 'NOTE', 'FAQ'].includes(p.type) ? p.type : 'HOUSE_RULE', title: str(p.title), content: str(p.content), sortOrder: i },
+        })
+      }
+    }
+  }
+}
+
+// UC-16 – Tạo chỗ nghỉ mới (mặc định DRAFT — BR-73).
 export async function createHomestay(req, res, next) {
   try {
-    const issue = validatePayload(req.body)
+    const issue = validate(req.body)
     if (issue) return res.status(400).json({ message: issue })
 
-    const { name, description, location, price, categoryId, amenities, cancellationPolicy, thumbnail } = req.body
-    let slug = req.body.slug ? slugify(req.body.slug) : slugify(name)
-    if (!slug) return res.status(400).json({ message: 'Không tạo được đường dẫn (slug) hợp lệ từ tên' })
+    let slug = req.body.slug ? slugify(req.body.slug) : slugify(req.body.name)
+    if (!slug) return res.status(400).json({ message: 'Không tạo được đường dẫn (slug) hợp lệ' })
+    if (await prisma.property.findUnique({ where: { slug } })) return res.status(409).json({ message: 'Đường dẫn (slug) đã tồn tại' })
+    const propertyCode = str(req.body.propertyCode) || 'PROP-' + Date.now().toString(36).toUpperCase()
+    if (await prisma.property.findUnique({ where: { propertyCode } })) return res.status(409).json({ message: 'Mã chỗ nghỉ đã tồn tại' })
 
-    const dup = await prisma.product.findUnique({ where: { slug } })
-    if (dup) return res.status(409).json({ message: 'Đường dẫn (slug) đã tồn tại, vui lòng đổi tên hoặc slug khác' })
-
-    const product = await prisma.product.create({
-      data: {
-        type: 'HOMESTAY',
-        status: 'HIDDEN', // BR-73: mặc định ẩn, admin bật hiển thị sau khi kiểm tra xong
-        name,
-        slug,
-        description: description || null,
-        location,
-        price: Number(price),
-        categoryId: categoryId != null ? Number(categoryId) : null,
-        amenities: Array.isArray(amenities) ? amenities.join(',') : amenities || null,
-        cancellationPolicy: cancellationPolicy || null,
-        thumbnail: thumbnail || null,
-      },
+    const property = await prisma.$transaction(async (tx) => {
+      const created = await tx.property.create({
+        data: { ...scalarData(req.body), slug, propertyCode, status: 'DRAFT', thumbnail: str(req.body.thumbnail), createdById: req.admin.sub },
+      })
+      await replaceAmenitiesAndPolicies(tx, created.id, req.body)
+      // Tạo sẵn 1 loại phòng mặc định để có thể thiết lập tồn kho ngay.
+      await tx.roomType.create({ data: { propertyId: created.id, name: 'Phòng tiêu chuẩn', maxOccupancy: 2, totalRooms: 1, basePricePerNight: created.basePrice } })
+      return created
     })
-
-    await logAdminAction(req.admin.sub, 'product.create', {
-      entityType: 'Product',
-      entityId: product.id,
-      detail: { name: product.name, slug: product.slug },
-    })
-
-    res.status(201).json({ product })
+    await logAdminAction(req.admin.sub, 'property.create', { entityType: 'Property', entityId: property.id, detail: { name: property.name } })
+    res.status(201).json({ property })
   } catch (err) {
     next(err)
   }
 }
 
-// UC-16 – Cập nhật thông tin homestay.
 export async function updateHomestay(req, res, next) {
   try {
     const id = Number(req.params.id)
-    const existing = await prisma.product.findUnique({ where: { id } })
-    if (!existing || existing.type !== 'HOMESTAY') {
-      return res.status(404).json({ message: 'Không tìm thấy homestay' })
-    }
-
-    const merged = { ...existing, ...req.body }
-    const issue = validatePayload(merged)
+    const existing = await prisma.property.findUnique({ where: { id } })
+    if (!existing) return res.status(404).json({ message: 'Không tìm thấy chỗ nghỉ' })
+    const issue = validate({ ...existing, ...req.body })
     if (issue) return res.status(400).json({ message: issue })
 
-    const data = {
-      name: req.body.name,
-      description: req.body.description ?? null,
-      location: req.body.location,
-      price: Number(req.body.price),
-      categoryId: req.body.categoryId != null ? Number(req.body.categoryId) : null,
-      amenities: Array.isArray(req.body.amenities) ? req.body.amenities.join(',') : req.body.amenities ?? null,
-      cancellationPolicy: req.body.cancellationPolicy ?? null,
-    }
-    if (req.body.thumbnail !== undefined) data.thumbnail = req.body.thumbnail
-
+    const data = scalarData({ ...existing, ...req.body })
+    if (req.body.thumbnail !== undefined) data.thumbnail = str(req.body.thumbnail)
     if (req.body.slug) {
       const slug = slugify(req.body.slug)
       if (slug !== existing.slug) {
-        const dup = await prisma.product.findUnique({ where: { slug } })
-        if (dup) return res.status(409).json({ message: 'Đường dẫn (slug) đã tồn tại' })
+        if (await prisma.property.findFirst({ where: { slug, id: { not: id } } })) return res.status(409).json({ message: 'Đường dẫn (slug) đã tồn tại' })
         data.slug = slug
       }
     }
-
-    const product = await prisma.product.update({ where: { id }, data })
-    await logAdminAction(req.admin.sub, 'product.update', { entityType: 'Product', entityId: id, detail: data })
-
-    res.json({ product })
+    const property = await prisma.$transaction(async (tx) => {
+      const updated = await tx.property.update({ where: { id }, data })
+      await replaceAmenitiesAndPolicies(tx, id, req.body)
+      return updated
+    })
+    await logAdminAction(req.admin.sub, 'property.update', { entityType: 'Property', entityId: id, detail: { name: property.name } })
+    res.json({ property })
   } catch (err) {
     next(err)
   }
 }
 
-// UC-16 (2a) – Hiển thị/gỡ hiển thị (không xóa, giữ lịch sử đơn — BR-73).
-// BR-75: nếu gỡ hiển thị mà còn đơn tương lai hợp lệ, vẫn cho phép nhưng CẢNH BÁO admin.
+// UC-16 (2a) – Đổi trạng thái hiển thị. BR-75: cảnh báo nếu còn đơn tương lai khi ẩn.
 export async function setVisibility(req, res, next) {
   try {
     const id = Number(req.params.id)
     const { status } = req.body
-    if (status !== 'VISIBLE' && status !== 'HIDDEN') {
-      return res.status(400).json({ message: 'Trạng thái không hợp lệ' })
-    }
-    const existing = await prisma.product.findUnique({ where: { id } })
-    if (!existing || existing.type !== 'HOMESTAY') {
-      return res.status(404).json({ message: 'Không tìm thấy homestay' })
-    }
+    if (!['DRAFT', 'VISIBLE', 'HIDDEN'].includes(status)) return res.status(400).json({ message: 'Trạng thái không hợp lệ' })
+    const existing = await prisma.property.findUnique({ where: { id } })
+    if (!existing) return res.status(404).json({ message: 'Không tìm thấy chỗ nghỉ' })
 
     let warning = null
-    if (status === 'HIDDEN') {
+    if (status !== 'VISIBLE') {
       const today = new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), new Date().getUTCDate()))
       const futureBookings = await prisma.booking.findMany({
-        where: { productId: id, type: 'HOMESTAY', status: { in: ACTIVE_STATUSES }, checkOut: { gte: today } },
+        where: { propertyId: id, type: 'HOMESTAY', status: { in: ACTIVE_STATUSES }, checkOut: { gte: today } },
         select: { code: true, checkIn: true, checkOut: true },
       })
-      if (futureBookings.length) {
-        warning = {
-          message: `Homestay vẫn còn ${futureBookings.length} đơn hợp lệ trong tương lai. Các đơn này không bị ảnh hưởng, nhưng homestay sẽ không còn hiển thị để đặt mới.`,
-          bookings: futureBookings,
-        }
-      }
+      if (futureBookings.length) warning = { message: `Chỗ nghỉ vẫn còn ${futureBookings.length} đơn hợp lệ trong tương lai. Các đơn không bị ảnh hưởng, nhưng sẽ không còn hiển thị để đặt mới.`, bookings: futureBookings }
     }
-
-    const product = await prisma.product.update({ where: { id }, data: { status } })
-    await logAdminAction(req.admin.sub, status === 'HIDDEN' ? 'product.hide' : 'product.show', {
-      entityType: 'Product',
-      entityId: id,
-    })
-
-    res.json({ product, warning })
+    const property = await prisma.property.update({ where: { id }, data: { status } })
+    await logAdminAction(req.admin.sub, status === 'VISIBLE' ? 'property.show' : 'property.hide', { entityType: 'Property', entityId: id })
+    res.json({ property, warning })
   } catch (err) {
     next(err)
   }
 }
 
-// UC-16 – Gắn ảnh đã tải lên (upload trước qua /api/admin/uploads) vào homestay.
+// ---------- Ảnh ----------
 export async function addImage(req, res, next) {
   try {
     const id = Number(req.params.id)
-    const { filename, order } = req.body
-    const product = await prisma.product.findUnique({ where: { id } })
-    if (!product || product.type !== 'HOMESTAY') {
-      return res.status(404).json({ message: 'Không tìm thấy homestay' })
-    }
+    const { filename, caption } = req.body
+    const property = await prisma.property.findUnique({ where: { id } })
+    if (!property) return res.status(404).json({ message: 'Không tìm thấy chỗ nghỉ' })
     if (!filename) return res.status(400).json({ message: 'Thiếu tên tệp ảnh' })
-
     const url = publicUploadUrl(filename)
-    const image = await prisma.productImage.create({ data: { productId: id, url, order: order ?? 0 } })
-    if (!product.thumbnail) {
-      await prisma.product.update({ where: { id }, data: { thumbnail: url } })
-    }
-    await logAdminAction(req.admin.sub, 'product.image.add', { entityType: 'Product', entityId: id, detail: { url } })
-
+    const count = await prisma.propertyImage.count({ where: { propertyId: id } })
+    const image = await prisma.propertyImage.create({ data: { propertyId: id, url, caption: str(caption), isCover: count === 0, sortOrder: count } })
+    if (!property.thumbnail) await prisma.property.update({ where: { id }, data: { thumbnail: url } })
+    await logAdminAction(req.admin.sub, 'property.image.add', { entityType: 'Property', entityId: id, detail: { url } })
     res.status(201).json({ image })
   } catch (err) {
     next(err)
@@ -231,113 +234,135 @@ export async function removeImage(req, res, next) {
   try {
     const id = Number(req.params.id)
     const imageId = Number(req.params.imageId)
-    await prisma.productImage.deleteMany({ where: { id: imageId, productId: id } })
-    await logAdminAction(req.admin.sub, 'product.image.remove', { entityType: 'Product', entityId: id, detail: { imageId } })
+    await prisma.propertyImage.deleteMany({ where: { id: imageId, propertyId: id } })
+    await logAdminAction(req.admin.sub, 'property.image.remove', { entityType: 'Property', entityId: id, detail: { imageId } })
     res.json({ ok: true })
   } catch (err) {
     next(err)
   }
 }
 
-// ---------- Lịch tồn phòng (BR-74) ----------
-
-// Xem lịch tồn phòng trong khoảng ngày; điền mặc định cho ngày chưa có bản ghi (chưa lưu).
-export async function getAvailability(req, res, next) {
+// ---------- Loại phòng ----------
+export async function createRoomType(req, res, next) {
   try {
     const id = Number(req.params.id)
-    const { from, to } = req.query
-    const product = await prisma.product.findUnique({ where: { id } })
-    if (!product || product.type !== 'HOMESTAY') {
-      return res.status(404).json({ message: 'Không tìm thấy homestay' })
-    }
-    const days = nightsBetween(from, to)
-    if (!days || !days.length) return res.status(400).json({ message: 'Khoảng ngày không hợp lệ' })
-
-    const rows = await prisma.homestayAvailability.findMany({
-      where: { productId: id, date: { gte: days[0], lte: days[days.length - 1] } },
+    if (!(await prisma.property.findUnique({ where: { id } }))) return res.status(404).json({ message: 'Không tìm thấy chỗ nghỉ' })
+    if (!str(req.body.name)) return res.status(400).json({ message: 'Thiếu tên loại phòng' })
+    const rt = await prisma.roomType.create({
+      data: {
+        propertyId: id,
+        name: str(req.body.name),
+        roomSize: num(req.body.roomSize),
+        bedType: str(req.body.bedType),
+        maxOccupancy: num(req.body.maxOccupancy, 2),
+        totalRooms: num(req.body.totalRooms, 1),
+        breakfastIncluded: Boolean(req.body.breakfastIncluded),
+        smokingAllowed: Boolean(req.body.smokingAllowed),
+        basePricePerNight: num(req.body.basePricePerNight, 0),
+        description: str(req.body.description),
+      },
     })
-    const byTime = new Map(rows.map((r) => [new Date(r.date).getTime(), r]))
-
-    const calendar = days.map((d) => {
-      const row = byTime.get(d.getTime())
-      return {
-        date: d,
-        totalRooms: row?.totalRooms ?? 0,
-        bookedRooms: row?.bookedRooms ?? 0,
-        priceOverride: row?.priceOverride ?? null,
-        saved: Boolean(row),
-      }
-    })
-    res.json({ basePrice: product.price, calendar })
+    await logAdminAction(req.admin.sub, 'roomtype.create', { entityType: 'RoomType', entityId: rt.id, detail: { propertyId: id, name: rt.name } })
+    res.status(201).json({ roomType: rt })
   } catch (err) {
     next(err)
   }
 }
 
-// Kiểm tra xung đột: ngày nào trong danh sách sẽ có totalRooms mới < số đang giữ (BR-75/2a-1).
-async function findConflicts(productId, dates, newTotalRooms) {
-  const rows = await prisma.homestayAvailability.findMany({ where: { productId, date: { in: dates } } })
-  const conflictDates = rows.filter((r) => r.bookedRooms > newTotalRooms).map((r) => new Date(r.date))
-  if (!conflictDates.length) return null
-
-  const minD = new Date(Math.min(...conflictDates.map((d) => d.getTime())))
-  const maxD = new Date(Math.max(...conflictDates.map((d) => d.getTime())) + 86400000)
-  const bookings = await prisma.booking.findMany({
-    where: {
-      productId,
-      type: 'HOMESTAY',
-      status: { in: ACTIVE_STATUSES },
-      checkOut: { gt: minD },
-      checkIn: { lt: maxD },
-    },
-    select: { code: true, checkIn: true, checkOut: true, status: true },
-  })
-  return { conflictDates, bookings }
-}
-
-// UC-16 (4a) – Thiết lập lịch tồn phòng cho một khoảng ngày: mở/chặn + giá riêng.
-// BR-75/2a-1: từ chối nếu làm mất hiệu lực đơn đang giữ chỗ hợp lệ trong khoảng đó.
-export async function setAvailability(req, res, next) {
+export async function updateRoomType(req, res, next) {
   try {
     const id = Number(req.params.id)
-    const { from, to, totalRooms, priceOverride } = req.body
-    const product = await prisma.product.findUnique({ where: { id } })
-    if (!product || product.type !== 'HOMESTAY') {
-      return res.status(404).json({ message: 'Không tìm thấy homestay' })
-    }
+    const rtId = Number(req.params.rtId)
+    const rt = await prisma.roomType.findFirst({ where: { id: rtId, propertyId: id } })
+    if (!rt) return res.status(404).json({ message: 'Không tìm thấy loại phòng' })
+    const data = {}
+    for (const k of ['name', 'bedType', 'description']) if (req.body[k] !== undefined) data[k] = str(req.body[k])
+    for (const k of ['roomSize', 'maxOccupancy', 'totalRooms', 'basePricePerNight']) if (req.body[k] !== undefined) data[k] = num(req.body[k])
+    for (const k of ['breakfastIncluded', 'smokingAllowed']) if (req.body[k] !== undefined) data[k] = Boolean(req.body[k])
+    const updated = await prisma.roomType.update({ where: { id: rtId }, data })
+    await logAdminAction(req.admin.sub, 'roomtype.update', { entityType: 'RoomType', entityId: rtId, detail: data })
+    res.json({ roomType: updated })
+  } catch (err) {
+    next(err)
+  }
+}
+
+export async function deleteRoomType(req, res, next) {
+  try {
+    const id = Number(req.params.id)
+    const rtId = Number(req.params.rtId)
+    const rt = await prisma.roomType.findFirst({ where: { id: rtId, propertyId: id } })
+    if (!rt) return res.status(404).json({ message: 'Không tìm thấy loại phòng' })
+    // BR: chặn xóa nếu còn đơn hợp lệ trên loại phòng này.
+    const active = await prisma.booking.count({ where: { roomTypeId: rtId, status: { in: ACTIVE_STATUSES } } })
+    if (active > 0) return res.status(409).json({ message: `Không thể xóa: còn ${active} đơn hợp lệ trên loại phòng này.` })
+    await prisma.roomType.delete({ where: { id: rtId } })
+    await logAdminAction(req.admin.sub, 'roomtype.delete', { entityType: 'RoomType', entityId: rtId })
+    res.json({ ok: true })
+  } catch (err) {
+    next(err)
+  }
+}
+
+// ---------- Lịch tồn phòng theo loại phòng (BR-74) ----------
+export async function getInventory(req, res, next) {
+  try {
+    const rtId = Number(req.params.rtId)
+    const { from, to } = req.query
+    const rt = await prisma.roomType.findFirst({ where: { id: rtId, propertyId: Number(req.params.id) } })
+    if (!rt) return res.status(404).json({ message: 'Không tìm thấy loại phòng' })
+    const days = nightsBetween(from, to)
+    if (!days || !days.length) return res.status(400).json({ message: 'Khoảng ngày không hợp lệ' })
+    const rows = await prisma.roomInventory.findMany({ where: { roomTypeId: rtId, date: { gte: days[0], lte: days[days.length - 1] } } })
+    const byTime = new Map(rows.map((r) => [new Date(r.date).getTime(), r]))
+    const calendar = days.map((d) => {
+      const row = byTime.get(d.getTime())
+      return { date: d, totalRooms: row?.totalRooms ?? 0, bookedRooms: row?.bookedRooms ?? 0, heldRooms: row?.heldRooms ?? 0, priceOverride: row?.priceOverride ?? null, isBlocked: row?.isBlocked ?? false, saved: Boolean(row) }
+    })
+    res.json({ basePrice: rt.basePricePerNight, calendar })
+  } catch (err) {
+    next(err)
+  }
+}
+
+// UC-16 (4a) – Thiết lập tồn kho cho khoảng ngày (mở/chặn + giá riêng). BR-75/2a-1: chặn nếu mất hiệu lực đơn đang giữ.
+export async function setInventory(req, res, next) {
+  try {
+    const id = Number(req.params.id)
+    const rtId = Number(req.params.rtId)
+    const { from, to, totalRooms, priceOverride, isBlocked } = req.body
+    const rt = await prisma.roomType.findFirst({ where: { id: rtId, propertyId: id } })
+    if (!rt) return res.status(404).json({ message: 'Không tìm thấy loại phòng' })
     const days = nightsBetween(from, to)
     if (!days || !days.length) return res.status(400).json({ message: 'Khoảng ngày không hợp lệ' })
     const rooms = Number(totalRooms)
-    if (!Number.isInteger(rooms) || rooms < 0) {
-      return res.status(400).json({ message: 'Số phòng không hợp lệ' }) // 5a
-    }
+    if (!Number.isInteger(rooms) || rooms < 0) return res.status(400).json({ message: 'Số phòng không hợp lệ' }) // 5a
 
-    const conflict = await findConflicts(id, days, rooms)
-    if (conflict) {
-      return res.status(409).json({
-        message: 'Không thể áp dụng: một số ngày trong khoảng này đang có đơn hợp lệ vượt quá số phòng mới. Vui lòng xử lý các đơn liên quan trước (UC-18).',
-        conflictDates: conflict.conflictDates,
-        bookings: conflict.bookings,
+    // BR-75/2a-1: từ chối nếu số phòng mới < số đã đặt trong bất kỳ ngày nào.
+    const existingRows = await prisma.roomInventory.findMany({ where: { roomTypeId: rtId, date: { in: days } } })
+    const conflictDates = existingRows.filter((r) => r.bookedRooms > rooms).map((r) => new Date(r.date))
+    if (conflictDates.length) {
+      const minD = new Date(Math.min(...conflictDates.map((d) => d.getTime())))
+      const maxD = new Date(Math.max(...conflictDates.map((d) => d.getTime())) + 86400000)
+      const bookings = await prisma.booking.findMany({
+        where: { propertyId: id, roomTypeId: rtId, type: 'HOMESTAY', status: { in: ACTIVE_STATUSES }, checkOut: { gt: minD }, checkIn: { lt: maxD } },
+        select: { code: true, checkIn: true, checkOut: true, status: true },
       })
+      return res.status(409).json({ message: 'Không thể áp dụng: một số ngày đang có đơn hợp lệ vượt quá số phòng mới. Vui lòng xử lý các đơn liên quan trước (UC-18).', conflictDates, bookings })
     }
 
     const price = priceOverride === '' || priceOverride == null ? null : Number(priceOverride)
+    const blocked = Boolean(isBlocked)
     await prisma.$transaction(
       days.map((d) =>
-        prisma.homestayAvailability.upsert({
-          where: { productId_date: { productId: id, date: d } },
-          create: { productId: id, date: d, totalRooms: rooms, priceOverride: price },
-          update: { totalRooms: rooms, priceOverride: price },
+        prisma.roomInventory.upsert({
+          where: { roomTypeId_date: { roomTypeId: rtId, date: d } },
+          create: { roomTypeId: rtId, date: d, totalRooms: rooms, priceOverride: price, isBlocked: blocked },
+          update: { totalRooms: rooms, priceOverride: price, isBlocked: blocked },
         }),
       ),
     )
-
-    await logAdminAction(req.admin.sub, 'availability.set', {
-      entityType: 'Product',
-      entityId: id,
-      detail: { from, to, totalRooms: rooms, priceOverride: price },
-    })
-
+    await logAdminAction(req.admin.sub, 'inventory.set', { entityType: 'RoomType', entityId: rtId, detail: { from, to, totalRooms: rooms, priceOverride: price, isBlocked: blocked } })
     res.json({ ok: true, days: days.length })
   } catch (err) {
     next(err)

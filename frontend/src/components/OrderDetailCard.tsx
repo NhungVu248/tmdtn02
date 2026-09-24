@@ -71,7 +71,7 @@ export function OrderDetailCard({ order, guestAuth, onChanged }: Props) {
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="font-mono text-sm text-slate-500">{order.code}</p>
-          <Link to={`/product/${order.productSlug}`} className="text-lg font-semibold hover:text-emerald-700">
+          <Link to={`${isTour ? '/tour/' : '/product/'}${order.productSlug}`} className="text-lg font-semibold hover:text-emerald-700">
             {order.productName}
           </Link>
         </div>

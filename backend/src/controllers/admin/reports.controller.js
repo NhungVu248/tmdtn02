@@ -39,54 +39,45 @@ export async function getReports(req, res, next) {
     // ----- Đơn theo trạng thái -----
     const bookingsInRange = await prisma.booking.findMany({
       where: { createdAt: { gte: from, lte: to } },
-      select: { status: true, type: true, productId: true, guests: true, children: true },
+      select: { status: true, type: true, productId: true, tourId: true, guests: true, children: true },
     })
     const statusMap = new Map()
     for (const b of bookingsInRange) statusMap.set(b.status, (statusMap.get(b.status) || 0) + 1)
     const ordersByStatus = [...statusMap.entries()].map(([status, count]) => ({ status, count }))
 
     // ----- Tour bán chạy (BR-110): số chỗ đã đặt theo tour, trừ đơn đã hủy -----
-    const tourBookings = bookingsInRange.filter((b) => b.type === 'TOUR' && b.status !== 'CANCELLED')
+    const tourBookings = bookingsInRange.filter((b) => b.type === 'TOUR' && b.status !== 'CANCELLED' && b.tourId)
     const tourMap = new Map()
     for (const b of tourBookings) {
-      const cur = tourMap.get(b.productId) || { productId: b.productId, bookingsCount: 0, seats: 0 }
+      const cur = tourMap.get(b.tourId) || { productId: b.tourId, bookingsCount: 0, seats: 0 }
       cur.bookingsCount += 1
       cur.seats += (b.guests || 0) + (b.children || 0)
-      tourMap.set(b.productId, cur)
+      tourMap.set(b.tourId, cur)
     }
     const topTourIds = [...tourMap.values()].sort((a, b) => b.seats - a.seats).slice(0, 10)
-    const tourProducts = await prisma.product.findMany({
+    const tourRows = await prisma.tour.findMany({
       where: { id: { in: topTourIds.map((t) => t.productId) } },
-      select: { id: true, name: true, slug: true },
+      select: { id: true, title: true, slug: true },
     })
-    const tourProductById = new Map(tourProducts.map((p) => [p.id, p]))
-    const topTours = topTourIds.map((t) => ({ ...t, name: tourProductById.get(t.productId)?.name, slug: tourProductById.get(t.productId)?.slug }))
+    const tourById = new Map(tourRows.map((p) => [p.id, p]))
+    const topTours = topTourIds.map((t) => ({ ...t, name: tourById.get(t.productId)?.title, slug: tourById.get(t.productId)?.slug }))
 
-    // ----- Công suất phòng homestay (BR-110): tổng bookedRooms/totalRooms trong kỳ theo từng homestay -----
-    const availabilityRows = await prisma.homestayAvailability.findMany({
+    // ----- Công suất phòng (BR-110): tổng bookedRooms/totalRooms trong kỳ theo từng chỗ nghỉ -----
+    // RoomInventory -> RoomType -> Property. Gộp theo propertyId qua roomType.
+    const invRows = await prisma.roomInventory.findMany({
       where: { date: { gte: from, lte: to } },
-      select: { productId: true, totalRooms: true, bookedRooms: true },
+      select: { totalRooms: true, bookedRooms: true, roomType: { select: { propertyId: true, property: { select: { name: true, slug: true } } } } },
     })
     const occMap = new Map()
-    for (const r of availabilityRows) {
-      const cur = occMap.get(r.productId) || { productId: r.productId, totalRoomNights: 0, bookedRoomNights: 0 }
+    for (const r of invRows) {
+      const pid = r.roomType.propertyId
+      const cur = occMap.get(pid) || { productId: pid, name: r.roomType.property?.name, slug: r.roomType.property?.slug, totalRoomNights: 0, bookedRoomNights: 0 }
       cur.totalRoomNights += r.totalRooms
       cur.bookedRoomNights += r.bookedRooms
-      occMap.set(r.productId, cur)
+      occMap.set(pid, cur)
     }
-    const homestayIds = [...occMap.keys()]
-    const homestayProducts = await prisma.product.findMany({
-      where: { id: { in: homestayIds } },
-      select: { id: true, name: true, slug: true },
-    })
-    const homestayById = new Map(homestayProducts.map((p) => [p.id, p]))
     const homestayOccupancy = [...occMap.values()]
-      .map((o) => ({
-        ...o,
-        name: homestayById.get(o.productId)?.name,
-        slug: homestayById.get(o.productId)?.slug,
-        rate: o.totalRoomNights > 0 ? Math.round((o.bookedRoomNights / o.totalRoomNights) * 1000) / 10 : 0,
-      }))
+      .map((o) => ({ ...o, rate: o.totalRoomNights > 0 ? Math.round((o.bookedRoomNights / o.totalRoomNights) * 1000) / 10 : 0 }))
       .sort((a, b) => b.rate - a.rate)
 
     // 2a: không có dữ liệu trong kỳ — frontend tự hiển thị thông báo khi mọi mảng đều rỗng.

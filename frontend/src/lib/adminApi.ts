@@ -19,6 +19,12 @@ export function setAdminToken(token: string | null) {
   adminToken = token
 }
 
+// Xử lý phiên quản trị hết hạn/không hợp lệ (401): do AdminAuthProvider đăng ký để đăng xuất + về login.
+let onAdminUnauthorized: () => void = () => {}
+export function setAdminUnauthorizedHandler(fn: () => void) {
+  onAdminUnauthorized = fn
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const headers = new Headers(init?.headers)
   if (adminToken) headers.set('Authorization', `Bearer ${adminToken}`)
@@ -34,6 +40,11 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
       if (b?.code) code = b.code
     } catch {
       // giữ message mặc định
+    }
+    // Phiên hết hạn/không hợp lệ ở BẤT KỲ thao tác nào (trừ chính lúc đăng nhập) -> đăng xuất + về login.
+    if (res.status === 401 && !path.includes('/admin/auth/login')) {
+      adminToken = null
+      onAdminUnauthorized()
     }
     throw new AdminApiError(res.status, message, code, body)
   }
@@ -74,38 +85,68 @@ const patchReq = <T>(path: string, body: unknown) =>
   })
 const del = <T>(path: string) => request<T>(path, { method: 'DELETE' })
 
+export interface AdminPropertyCat { id: number; name: string; kind?: string | null }
+export interface AdminAmenity { id: number; name: string; icon: string | null; scope: string }
+export interface AdminRoomType {
+  id: number
+  name: string
+  roomSize: number | null
+  bedType: string | null
+  maxOccupancy: number
+  totalRooms: number
+  breakfastIncluded: boolean
+  smokingAllowed: boolean
+  basePricePerNight: number
+  description: string | null
+  _count?: { inventory: number }
+}
+
 export interface AdminProduct {
   id: number
   name: string
   slug: string
-  status: 'VISIBLE' | 'HIDDEN'
-  location: string | null
-  price: number
+  propertyCode: string
+  propertyType: string
+  status: 'DRAFT' | 'VISIBLE' | 'HIDDEN'
+  address: string | null
+  basePrice: number
   thumbnail: string | null
-  categoryId: number | null
-  category?: { name: string } | null
+  starRating: number | null
+  province?: { name: string } | null
+  area?: { name: string } | null
+  _count?: { roomTypes: number }
   updatedAt: string
 }
 
 export interface AdminProductDetail extends AdminProduct {
+  shortDescription: string | null
   description: string | null
-  amenities: string | null
-  cancellationPolicy: string | null
-  images: { id: number; url: string; order: number }[]
+  provinceId: number | null
+  areaId: number | null
+  latitude: number | null
+  longitude: number | null
+  checkInTime: string | null
+  checkOutTime: string | null
+  depositRate: number | null
+  cancellationPolicyId: number | null
+  contactPhone: string | null
+  contactEmail: string | null
+  metaTitle: string | null
+  metaDescription: string | null
+  images: { id: number; url: string; caption: string | null; isCover: boolean; sortOrder: number }[]
+  amenities: { amenity: AdminAmenity }[]
+  policies: { id: number; type: string; title: string | null; content: string }[]
+  roomTypes: AdminRoomType[]
 }
 
-export interface AvailabilityDay {
+export interface InventoryDay {
   date: string
   totalRooms: number
   bookedRooms: number
+  heldRooms: number
   priceOverride: number | null
+  isBlocked: boolean
   saved: boolean
-}
-
-export interface AvailabilityConflict {
-  message: string
-  conflictDates: string[]
-  bookings: { code: string; checkIn: string; checkOut: string; status: string }[]
 }
 
 export const adminApi = {
@@ -119,15 +160,16 @@ export const adminApi = {
     if (params.search) qs.set('search', params.search)
     return get<{ items: AdminProduct[] }>(`/api/admin/homestays?${qs.toString()}`)
   },
-  getHomestay: (id: number) => get<{ product: AdminProductDetail }>(`/api/admin/homestays/${id}`),
-  createHomestay: (data: Record<string, unknown>) => post<{ product: AdminProductDetail }>('/api/admin/homestays', data),
+  getHomestay: (id: number) => get<{ property: AdminProductDetail }>(`/api/admin/homestays/${id}`),
+  createHomestay: (data: Record<string, unknown>) => post<{ property: AdminProductDetail }>('/api/admin/homestays', data),
   updateHomestay: (id: number, data: Record<string, unknown>) =>
-    putReq<{ product: AdminProductDetail }>(`/api/admin/homestays/${id}`, data),
-  setHomestayVisibility: (id: number, status: 'VISIBLE' | 'HIDDEN') =>
-    patchReq<{ product: AdminProduct; warning: { message: string; bookings: unknown[] } | null }>(
+    putReq<{ property: AdminProductDetail }>(`/api/admin/homestays/${id}`, data),
+  setHomestayVisibility: (id: number, status: 'DRAFT' | 'VISIBLE' | 'HIDDEN') =>
+    patchReq<{ property: AdminProduct; warning: { message: string; bookings: unknown[] } | null }>(
       `/api/admin/homestays/${id}/visibility`,
       { status },
     ),
+  getHomestayMeta: () => get<{ provinces: AdminPropertyCat[]; areas: AdminPropertyCat[]; amenities: AdminAmenity[]; policies: { id: number; name: string }[] }>('/api/admin/homestays/meta'),
   uploadImage: async (file: File) => {
     const form = new FormData()
     form.append('file', file)
@@ -142,32 +184,39 @@ export const adminApi = {
     }
     return res.json() as Promise<{ filename: string; url: string }>
   },
-  addImage: (productId: number, filename: string) =>
-    post<{ image: { id: number; url: string; order: number } }>(`/api/admin/homestays/${productId}/images`, { filename }),
-  removeImage: (productId: number, imageId: number) =>
-    del<{ ok: boolean }>(`/api/admin/homestays/${productId}/images/${imageId}`),
-  getAvailability: (productId: number, from: string, to: string) =>
-    get<{ basePrice: number; calendar: AvailabilityDay[] }>(
-      `/api/admin/homestays/${productId}/availability?from=${from}&to=${to}`,
-    ),
-  setAvailability: (productId: number, data: { from: string; to: string; totalRooms: number; priceOverride?: number | null }) =>
-    putReq<{ ok: boolean; days: number }>(`/api/admin/homestays/${productId}/availability`, data),
+  addImage: (propertyId: number, filename: string) =>
+    post<{ image: { id: number; url: string } }>(`/api/admin/homestays/${propertyId}/images`, { filename }),
+  removeImage: (propertyId: number, imageId: number) =>
+    del<{ ok: boolean }>(`/api/admin/homestays/${propertyId}/images/${imageId}`),
+  // Loại phòng
+  createRoomType: (propertyId: number, data: Record<string, unknown>) =>
+    post<{ roomType: AdminRoomType }>(`/api/admin/homestays/${propertyId}/room-types`, data),
+  updateRoomType: (propertyId: number, rtId: number, data: Record<string, unknown>) =>
+    putReq<{ roomType: AdminRoomType }>(`/api/admin/homestays/${propertyId}/room-types/${rtId}`, data),
+  deleteRoomType: (propertyId: number, rtId: number) =>
+    del<{ ok: boolean }>(`/api/admin/homestays/${propertyId}/room-types/${rtId}`),
+  // Lịch tồn phòng theo loại phòng
+  getInventory: (propertyId: number, rtId: number, from: string, to: string) =>
+    get<{ basePrice: number; calendar: InventoryDay[] }>(`/api/admin/homestays/${propertyId}/room-types/${rtId}/inventory?from=${from}&to=${to}`),
+  setInventory: (propertyId: number, rtId: number, data: { from: string; to: string; totalRooms: number; priceOverride?: number | null; isBlocked?: boolean }) =>
+    putReq<{ ok: boolean; days: number }>(`/api/admin/homestays/${propertyId}/room-types/${rtId}/inventory`, data),
 
-  // UC-17 – Quản lý tour
+  // UC-17 – Quản lý tour (bảng riêng)
   listTours: (params: { status?: string; search?: string } = {}) => {
     const qs = new URLSearchParams()
     if (params.status) qs.set('status', params.status)
     if (params.search) qs.set('search', params.search)
     return get<{ items: AdminTour[] }>(`/api/admin/tours?${qs.toString()}`)
   },
-  getTour: (id: number) => get<{ product: AdminTourDetail }>(`/api/admin/tours/${id}`),
-  createTour: (data: Record<string, unknown>) => post<{ product: AdminTourDetail }>('/api/admin/tours', data),
-  updateTour: (id: number, data: Record<string, unknown>) => putReq<{ product: AdminTourDetail }>(`/api/admin/tours/${id}`, data),
-  setTourVisibility: (id: number, status: 'VISIBLE' | 'HIDDEN') =>
-    patchReq<{ product: AdminTour; warning: { message: string; bookings: unknown[] } | null }>(
+  getTour: (id: number) => get<{ tour: AdminTourDetail }>(`/api/admin/tours/${id}`),
+  createTour: (data: Record<string, unknown>) => post<{ tour: AdminTourDetail }>('/api/admin/tours', data),
+  updateTour: (id: number, data: Record<string, unknown>) => putReq<{ tour: AdminTourDetail }>(`/api/admin/tours/${id}`, data),
+  setTourVisibility: (id: number, status: 'DRAFT' | 'VISIBLE' | 'HIDDEN') =>
+    patchReq<{ tour: AdminTour; warning: { message: string; bookings: unknown[] } | null }>(
       `/api/admin/tours/${id}/visibility`,
       { status },
     ),
+  getTourCategories: () => get<{ regions: AdminTourCat[]; themes: AdminTourCat[]; durations: AdminTourCat[]; policies: { id: number; name: string }[] }>('/api/admin/tours/categories'),
   uploadTourImage: async (file: File) => {
     const form = new FormData()
     form.append('file', file)
@@ -182,19 +231,19 @@ export const adminApi = {
     }
     return res.json() as Promise<{ filename: string; url: string }>
   },
-  addTourImage: (productId: number, filename: string) =>
-    post<{ image: { id: number; url: string; order: number } }>(`/api/admin/tours/${productId}/images`, { filename }),
-  removeTourImage: (productId: number, imageId: number) =>
-    del<{ ok: boolean }>(`/api/admin/tours/${productId}/images/${imageId}`),
-  createDeparture: (productId: number, data: { date: string; totalSeats: number; priceAdultOverride?: number | null; priceChildOverride?: number | null }) =>
-    post<{ departure: Departure }>(`/api/admin/tours/${productId}/departures`, data),
+  addTourImage: (tourId: number, filename: string) =>
+    post<{ image: TourImage }>(`/api/admin/tours/${tourId}/images`, { filename }),
+  removeTourImage: (tourId: number, imageId: number) =>
+    del<{ ok: boolean }>(`/api/admin/tours/${tourId}/images/${imageId}`),
+  createDeparture: (tourId: number, data: { date: string; totalSlots: number; priceAdult?: number | null; priceChild?: number | null; priceInfant?: number | null; guideName?: string }) =>
+    post<{ departure: Departure }>(`/api/admin/tours/${tourId}/departures`, data),
   updateDeparture: (
-    productId: number,
+    tourId: number,
     depId: number,
-    data: { totalSeats?: number; priceAdultOverride?: number | null; priceChildOverride?: number | null },
-  ) => putReq<{ departure: Departure }>(`/api/admin/tours/${productId}/departures/${depId}`, data),
-  closeDeparture: (productId: number, depId: number) =>
-    patchReq<{ departure: Departure }>(`/api/admin/tours/${productId}/departures/${depId}/close`, {}),
+    data: { totalSlots?: number; priceAdult?: number | null; priceChild?: number | null; guideName?: string },
+  ) => putReq<{ departure: Departure }>(`/api/admin/tours/${tourId}/departures/${depId}`, data),
+  closeDeparture: (tourId: number, depId: number) =>
+    patchReq<{ departure: Departure }>(`/api/admin/tours/${tourId}/departures/${depId}/close`, {}),
 
   // UC-18 – Quản lý đơn & xử lý hủy/hoàn tiền
   listOrders: (params: { status?: string; type?: string; from?: string; to?: string; search?: string } = {}) => {
@@ -442,38 +491,74 @@ export interface AdminRefundRequest {
   createdAt: string
 }
 
-export interface AdminTour {
+export interface AdminTourCat {
   id: number
   name: string
+  kind: string | null
+}
+
+export interface AdminTour {
+  id: number
+  title: string
   slug: string
-  status: 'VISIBLE' | 'HIDDEN'
-  location: string | null
-  price: number
-  priceChild: number | null
-  durationDays: number | null
+  tourCode: string
+  status: 'DRAFT' | 'VISIBLE' | 'HIDDEN'
+  destination: string | null
+  departurePoint: string | null
+  basePrice: number
+  durationDays: number
+  durationNights: number
   thumbnail: string | null
-  categoryId: number | null
-  category?: { name: string } | null
+  region?: { name: string } | null
+  theme?: { name: string } | null
   updatedAt: string
+}
+
+export interface TourImage {
+  id: number
+  url: string
+  caption: string | null
+  isCover: boolean
+  sortOrder: number
+}
+
+export interface DeparturePrice {
+  id: number
+  paxType: 'ADULT' | 'CHILD' | 'INFANT'
+  price: number
+  description: string | null
 }
 
 export interface Departure {
   id: number
-  productId: number
-  date: string
-  totalSeats: number
-  bookedSeats: number
-  priceAdultOverride: number | null
-  priceChildOverride: number | null
-  closed: boolean
+  tourId: number
+  departureDate: string
+  returnDate: string | null
+  totalSlots: number
+  bookedSlots: number
+  heldSlots: number
+  status: 'OPEN' | 'CLOSED' | 'FULL' | 'CANCELLED'
+  guideName: string | null
+  prices: DeparturePrice[]
 }
 
 export interface AdminTourDetail extends AdminTour {
+  shortDescription: string | null
   description: string | null
-  itinerary: string | null
-  included: string | null
-  excluded: string | null
-  cancellationPolicy: string | null
-  images: { id: number; url: string; order: number }[]
+  highlights: string | null
+  regionId: number | null
+  themeId: number | null
+  meetingPoint: string | null
+  minPax: number
+  maxPax: number
+  guideLanguage: string | null
+  depositRate: number | null
+  cancellationPolicyId: number | null
+  metaTitle: string | null
+  metaDescription: string | null
+  images: TourImage[]
+  itinerary: { id: number; dayNumber: number; title: string | null; description: string | null; meals: string | null; accommodation: string | null }[]
+  inclusions: { id: number; type: 'INCLUDED' | 'EXCLUDED'; itemText: string }[]
+  notes: { id: number; type: 'TERM' | 'FAQ' | 'REDEMPTION'; title: string | null; content: string }[]
   departures: Departure[]
 }

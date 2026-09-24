@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { AdminApiError, adminApi } from '../../lib/adminApi'
 import { useAdminAuth } from '../../lib/adminAuth'
 
@@ -7,6 +7,8 @@ import { useAdminAuth } from '../../lib/adminAuth'
 export function AdminLoginPage() {
   const navigate = useNavigate()
   const location = useLocation()
+  const [params] = useSearchParams()
+  const expired = params.get('expired') === '1'
   const { login } = useAdminAuth()
 
   const [username, setUsername] = useState('')
@@ -38,6 +40,12 @@ export function AdminLoginPage() {
       <div className="w-full max-w-sm rounded-xl border border-slate-800 bg-slate-950 p-6">
         <h1 className="text-center text-xl font-bold text-white">🛠️ StayTour Admin</h1>
         <p className="mt-1 text-center text-sm text-slate-500">Đăng nhập khu vực quản trị</p>
+
+        {expired && (
+          <div className="mt-4 rounded-lg border border-amber-700 bg-amber-950/40 px-3 py-2 text-sm text-amber-300">
+            Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại để tiếp tục.
+          </div>
+        )}
 
         <form onSubmit={submit} className="mt-6 space-y-4">
           <label className="block">

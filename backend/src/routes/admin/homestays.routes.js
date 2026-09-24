@@ -2,13 +2,17 @@ import { Router } from 'express'
 import {
   addImage,
   createHomestay,
-  getAvailability,
+  createRoomType,
+  deleteRoomType,
   getHomestay,
+  getInventory,
+  homestayMeta,
   listHomestays,
   removeImage,
-  setAvailability,
+  setInventory,
   setVisibility,
   updateHomestay,
+  updateRoomType,
 } from '../../controllers/admin/homestays.controller.js'
 import { uploadFile } from '../../controllers/admin/uploads.controller.js'
 import { requireAdmin } from '../../middleware/adminAuth.middleware.js'
@@ -21,6 +25,7 @@ router.use(requireAdmin)
 
 // Upload ảnh (BR-76) — đặt trước các route /:id để tránh nhầm "uploads" thành id.
 router.post('/uploads/image', uploadImage.single('file'), uploadFile)
+router.get('/meta', homestayMeta)
 
 router.get('/', listHomestays)
 router.post('/', createHomestay)
@@ -31,7 +36,13 @@ router.patch('/:id/visibility', setVisibility)
 router.post('/:id/images', addImage)
 router.delete('/:id/images/:imageId', removeImage)
 
-router.get('/:id/availability', getAvailability)
-router.put('/:id/availability', setAvailability)
+// Loại phòng
+router.post('/:id/room-types', createRoomType)
+router.put('/:id/room-types/:rtId', updateRoomType)
+router.delete('/:id/room-types/:rtId', deleteRoomType)
+
+// Lịch tồn phòng theo loại phòng
+router.get('/:id/room-types/:rtId/inventory', getInventory)
+router.put('/:id/room-types/:rtId/inventory', setInventory)
 
 export default router

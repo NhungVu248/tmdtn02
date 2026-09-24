@@ -24,20 +24,21 @@ export function isEmailConfigured() {
   return smtpConfigured
 }
 
-// Gửi email xác thực. Trả về true nếu gửi được (hoặc dev-log), ném lỗi nếu SMTP lỗi.
-export async function sendVerificationEmail(to, verifyUrl) {
+// UC-05 – Gửi MÃ OTP xác thực tài khoản về email. Ném lỗi nếu SMTP lỗi (để controller báo gửi lại).
+export async function sendVerificationEmail(to, code) {
   const from = process.env.MAIL_FROM || 'StayTour <no-reply@staytour.example>'
-  const subject = 'Xác thực tài khoản StayTour'
+  const subject = 'Mã xác thực tài khoản StayTour'
   const html = `
     <p>Chào bạn,</p>
-    <p>Cảm ơn bạn đã đăng ký StayTour. Vui lòng bấm liên kết dưới đây để kích hoạt tài khoản:</p>
-    <p><a href="${verifyUrl}">Kích hoạt tài khoản</a></p>
-    <p>Liên kết có hiệu lực trong 24 giờ. Nếu bạn không đăng ký, hãy bỏ qua email này.</p>
+    <p>Cảm ơn bạn đã đăng ký StayTour. Mã xác thực (OTP) của bạn là:</p>
+    <p style="font-size:28px;font-weight:bold;letter-spacing:6px;margin:16px 0">${code}</p>
+    <p>Mã có hiệu lực trong <strong>10 phút</strong>. Vui lòng nhập mã này để kích hoạt tài khoản.</p>
+    <p>Nếu bạn không đăng ký, hãy bỏ qua email này.</p>
   `
 
   if (!transporter) {
-    // Dev: không có SMTP -> log liên kết để hoàn tất luồng.
-    console.log(`[MAILER dev] Gửi xác thực tới ${to}: ${verifyUrl}`)
+    // Không có SMTP -> log mã ra console để không chặn luồng.
+    console.log(`[MAILER dev] Mã OTP xác thực tới ${to}: ${code}`)
     return true
   }
 
@@ -109,6 +110,24 @@ export async function sendReviewInviteEmail(to, info) {
     return true
   }
   await transporter.sendMail({ from, to, subject: `Chia sẻ trải nghiệm của bạn — StayTour`, html })
+  return true
+}
+
+// UC-15 (BR-64) – Thư cảm ơn + mời đánh giá cho KHÁCH ĐÃ ĐĂNG NHẬP (không dùng token,
+// đánh giá ngay trong "Đơn của tôi"). Gửi khi kỳ lưu trú/chuyến đi kết thúc.
+export async function sendReviewThankYouEmail(to, info) {
+  const from = process.env.MAIL_FROM || 'StayTour <no-reply@staytour.example>'
+  const html = `
+    <p>Cảm ơn bạn đã sử dụng dịch vụ tại StayTour!</p>
+    <p>Đơn <strong>${info.code}</strong> (${info.productName}) của bạn đã hoàn tất. Hi vọng bạn đã có trải nghiệm tuyệt vời.</p>
+    <p>Hãy chia sẻ cảm nhận để giúp những khách hàng khác:</p>
+    <p><a href="${info.reviewUrl}">Viết đánh giá trong "Đơn của tôi"</a></p>
+  `
+  if (!transporter) {
+    console.log(`[MAILER dev] Cảm ơn + mời đánh giá đơn ${info.code} tới ${to}: ${info.reviewUrl}`)
+    return true
+  }
+  await transporter.sendMail({ from, to, subject: `Cảm ơn bạn — chia sẻ trải nghiệm tại StayTour`, html })
   return true
 }
 

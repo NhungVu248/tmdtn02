@@ -7,7 +7,7 @@ import { sendCancellationEmail } from '../lib/mailer.js'
 // giữ lại `product` đã include vì prisma.update() không trả kèm quan hệ.
 async function withCompletion(booking) {
   const updated = await maybeCompleteBooking(booking)
-  return { ...booking, ...updated, product: booking.product }
+  return { ...booking, ...updated, property: booking.property, tour: booking.tour }
 }
 
 const MAX_LOOKUP_ATTEMPTS = 5 // BR-51
@@ -21,14 +21,28 @@ function availableActions(status) {
   }
 }
 
+// Đơn homestay -> b.property; đơn tour -> b.tour (bảng riêng). Trả về thông tin sản phẩm thống nhất.
+function prodOf(b) {
+  if (b.tour) {
+    return { name: b.tour.title, slug: b.tour.slug, thumbnail: b.tour.thumbnail, cancellationPolicy: null }
+  }
+  return {
+    name: b.property?.name ?? '',
+    slug: b.property?.slug ?? '',
+    thumbnail: b.property?.thumbnail ?? null,
+    cancellationPolicy: null,
+  }
+}
+
 function orderSummary(b) {
+  const p = prodOf(b)
   return {
     code: b.code,
     type: b.type,
     status: b.status,
-    productName: b.product.name,
-    productSlug: b.product.slug,
-    thumbnail: b.product.thumbnail,
+    productName: p.name,
+    productSlug: p.slug,
+    thumbnail: p.thumbnail,
     checkIn: b.checkIn,
     checkOut: b.checkOut,
     nights: b.nights,
@@ -52,7 +66,7 @@ async function orderDetail(b) {
     paymentMethod: b.paymentMethod,
     depositPaidAt: b.depositPaidAt,
     cancelledAt: b.cancelledAt,
-    cancellationPolicy: b.product.cancellationPolicy,
+    cancellationPolicy: prodOf(b).cancellationPolicy,
     actions: availableActions(b.status),
     // UC-14 – mức hoàn tiền dự kiến nếu hủy ngay bây giờ (chỉ để hiển thị, chưa thực hiện).
     cancelPreview: await computeRefund(b),
@@ -64,7 +78,7 @@ export async function listMyOrders(req, res, next) {
   try {
     const bookings = await prisma.booking.findMany({
       where: { userId: req.user.sub },
-      include: { product: { select: { name: true, slug: true, thumbnail: true, cancellationPolicy: true } } },
+      include: { property: { select: { name: true, slug: true, thumbnail: true } }, tour: { select: { title: true, slug: true, thumbnail: true } } },
       orderBy: { createdAt: 'desc' },
     })
     const updated = await Promise.all(bookings.map(withCompletion))
@@ -79,7 +93,7 @@ export async function getMyOrder(req, res, next) {
   try {
     const booking = await prisma.booking.findUnique({
       where: { code: req.params.code },
-      include: { product: true },
+      include: { property: true, tour: true },
     })
     if (!booking || booking.userId !== req.user.sub) {
       // Không tiết lộ đơn có tồn tại hay không — cùng thông báo cho cả 2 trường hợp.
@@ -105,7 +119,7 @@ export async function lookupOrder(req, res, next) {
 
     const booking = await prisma.booking.findUnique({
       where: { code: trimmedCode },
-      include: { product: true },
+      include: { property: true, tour: true },
     })
 
     const logAttempt = (success) =>
@@ -166,7 +180,7 @@ export async function cancelOrder(req, res, next) {
     const code = String(req.params.code || '').trim().toUpperCase()
     const { pin, email } = req.body || {}
 
-    const booking = await prisma.booking.findUnique({ where: { code }, include: { product: true } })
+    const booking = await prisma.booking.findUnique({ where: { code }, include: { property: true, tour: true } })
     if (!booking) {
       return res.status(404).json({ message: 'Không tìm thấy đơn' })
     }
@@ -205,25 +219,24 @@ export async function cancelOrder(req, res, next) {
     const ops = []
     if (booking.type === 'HOMESTAY' && booking.checkIn && booking.checkOut) {
       const nights = nightsBetween(booking.checkIn.toISOString(), booking.checkOut.toISOString())
-      if (nights?.length) {
+      if (nights?.length && booking.roomTypeId) {
         ops.push(
-          prisma.homestayAvailability.updateMany({
-            where: { productId: booking.productId, date: { in: nights }, bookedRooms: { gt: 0 } },
+          prisma.roomInventory.updateMany({
+            where: { roomTypeId: booking.roomTypeId, date: { in: nights }, bookedRooms: { gt: 0 } },
             data: { bookedRooms: { decrement: 1 } },
           }),
         )
       }
-    } else if (booking.type === 'TOUR' && booking.checkIn) {
-      const nextDay = new Date(booking.checkIn.getTime() + 86400000)
-      const departure = await prisma.tourDeparture.findFirst({
-        where: { productId: booking.productId, date: { gte: booking.checkIn, lt: nextDay } },
-      })
+    } else if (booking.type === 'TOUR') {
+      const departure = booking.tourDepartureId
+        ? await prisma.tourDeparture.findUnique({ where: { id: booking.tourDepartureId } })
+        : null
       if (departure) {
         const seats = (booking.guests || 0) + (booking.children || 0)
         ops.push(
           prisma.tourDeparture.update({
             where: { id: departure.id },
-            data: { bookedSeats: { decrement: Math.min(seats, departure.bookedSeats) } },
+            data: { bookedSlots: { decrement: Math.min(seats, departure.bookedSlots) } },
           }),
         )
       }
@@ -250,13 +263,13 @@ export async function cancelOrder(req, res, next) {
     // BR-60: email xác nhận hủy, nêu rõ mức hoàn tiền (gửi nền, không chặn response).
     sendCancellationEmail(booking.guestEmail, {
       code: booking.code,
-      productName: booking.product.name,
+      productName: prodOf(booking).name,
       refundAmount: refund.refundAmount,
       ratio: refund.ratio,
     }).catch((e) => console.error('Gửi email hủy đơn thất bại:', e))
 
     res.json({
-      order: await orderDetail({ ...booking, ...updated, product: booking.product }),
+      order: await orderDetail({ ...booking, ...updated, property: booking.property, tour: booking.tour }),
       refund,
     })
   } catch (err) {

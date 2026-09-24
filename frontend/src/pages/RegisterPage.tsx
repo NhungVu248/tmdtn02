@@ -1,11 +1,13 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { GoogleSignInButton } from '../components/GoogleSignInButton'
+import { OtpInput } from '../components/OtpInput'
 import { ApiError, api, type RegisterResult } from '../lib/api'
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 export function RegisterPage() {
+  const navigate = useNavigate()
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -17,6 +19,12 @@ export function RegisterPage() {
   const [loading, setLoading] = useState(false)
   const [done, setDone] = useState<RegisterResult | null>(null)
   const [resendMsg, setResendMsg] = useState<string | null>(null)
+
+  // Bước nhập OTP sau khi đăng ký.
+  const [otp, setOtp] = useState('')
+  const [verifying, setVerifying] = useState(false)
+  const [otpError, setOtpError] = useState<string | null>(null)
+  const [verified, setVerified] = useState(false)
 
   // Kiểm tra hợp lệ phía client (đồng bộ với server).
   function clientValidate(): string | null {
@@ -55,44 +63,74 @@ export function RegisterPage() {
 
   async function resend() {
     setResendMsg(null)
+    setOtpError(null)
+    setOtp('')
     try {
       const r = await api.resendVerification(done!.email)
       setResendMsg(r.message)
-      if (r.devVerifyUrl) setDone({ ...done!, devVerifyUrl: r.devVerifyUrl, emailSent: true })
     } catch {
       setResendMsg('Không gửi lại được. Vui lòng thử lại sau.')
     }
   }
 
-  // Màn hình sau khi đăng ký: nhắc kiểm tra email + gửi lại.
+  async function verifyOtp(e: React.FormEvent) {
+    e.preventDefault()
+    setOtpError(null)
+    if (otp.length !== 6) {
+      setOtpError('Vui lòng nhập đủ 6 chữ số.')
+      return
+    }
+    setVerifying(true)
+    try {
+      await api.verifyEmail(done!.email, otp)
+      setVerified(true)
+      setTimeout(() => navigate('/login'), 1500)
+    } catch (err) {
+      setOtpError(err instanceof ApiError ? err.message : 'Xác thực thất bại. Vui lòng thử lại.')
+      setOtp('')
+    } finally {
+      setVerifying(false)
+    }
+  }
+
+  // Màn hình sau khi đăng ký: nhập mã OTP đã gửi về email.
   if (done) {
+    if (verified) {
+      return (
+        <div className="mx-auto max-w-md px-4 py-16 text-center">
+          <div className="text-4xl">✅</div>
+          <h1 className="mt-3 text-xl font-semibold">Xác thực thành công</h1>
+          <p className="mt-2 text-slate-600">Đang chuyển tới trang đăng nhập…</p>
+        </div>
+      )
+    }
     return (
       <div className="mx-auto max-w-md px-4 py-16 text-center">
         <div className="text-4xl">📧</div>
-        <h1 className="mt-3 text-xl font-semibold">Kiểm tra email của bạn</h1>
+        <h1 className="mt-3 text-xl font-semibold">Nhập mã xác thực</h1>
         <p className="mt-2 text-slate-600">
-          Chúng tôi đã gửi liên kết kích hoạt tới <strong>{done.email}</strong>. Vui lòng bấm liên kết để
-          hoàn tất đăng ký.
+          Chúng tôi đã gửi mã OTP gồm 6 chữ số tới <strong>{done.email}</strong>. Mã có hiệu lực trong 10 phút.
         </p>
         {!done.emailSent && (
           <p className="mt-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-            Chưa gửi được email xác thực. Hãy thử gửi lại.
+            Chưa gửi được mã xác thực. Hãy thử gửi lại.
           </p>
         )}
-        {/* Môi trường dev không có SMTP: hiện liên kết để hoàn tất luồng. */}
-        {done.devVerifyUrl && (
-          <p className="mt-3 break-all rounded-lg bg-slate-100 px-3 py-2 text-xs text-slate-600">
-            [DEV] Liên kết xác thực:{' '}
-            <a href={done.devVerifyUrl} className="text-emerald-700 underline">
-              {done.devVerifyUrl}
-            </a>
-          </p>
-        )}
-        <button
-          onClick={resend}
-          className="mt-4 rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium hover:bg-slate-50"
-        >
-          Gửi lại email xác thực
+
+        <form onSubmit={verifyOtp} className="mt-6">
+          <OtpInput value={otp} onChange={setOtp} disabled={verifying} />
+          {otpError && <p className="mt-3 text-sm text-red-600">{otpError}</p>}
+          <button
+            type="submit"
+            disabled={verifying || otp.length !== 6}
+            className="mt-5 w-full rounded-lg bg-emerald-600 px-4 py-2.5 font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+          >
+            {verifying ? 'Đang xác thực...' : 'Xác thực'}
+          </button>
+        </form>
+
+        <button onClick={resend} className="mt-4 text-sm font-medium text-emerald-700 hover:underline">
+          Gửi lại mã OTP
         </button>
         {resendMsg && <p className="mt-2 text-sm text-slate-500">{resendMsg}</p>}
         <p className="mt-6 text-sm text-slate-500">

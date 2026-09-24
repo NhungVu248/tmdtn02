@@ -3,7 +3,7 @@ import { prisma } from './prisma.js'
 // UC-12 – Kiểm tra và tính chiết khấu cho một mã giảm giá.
 // BR-45: còn hiệu lực (thời gian, lượt dùng) + điều kiện đơn (giá trị tối thiểu, phạm vi, đối tượng).
 // Trả về { ok, message, discount, discountCode } — discount = số tiền được giảm (đã chặn không vượt subtotal).
-export async function validateDiscount({ code, type, productId, subtotal, userId }) {
+export async function validateDiscount({ code, type, productId, propertyId, tourId, subtotal, userId }) {
   if (!code || !String(code).trim()) {
     return { ok: false, message: 'Vui lòng nhập mã giảm giá' }
   }
@@ -32,6 +32,12 @@ export async function validateDiscount({ code, type, productId, subtotal, userId
   }
   if (row.productId && row.productId !== productId) {
     return { ok: false, message: 'Mã không áp dụng cho sản phẩm này', code: 'SCOPE' }
+  }
+  if (row.tourId && row.tourId !== tourId) {
+    return { ok: false, message: 'Mã không áp dụng cho tour này', code: 'SCOPE' }
+  }
+  if (row.propertyId && row.propertyId !== propertyId) {
+    return { ok: false, message: 'Mã không áp dụng cho chỗ nghỉ này', code: 'SCOPE' }
   }
 
   // 3a: đối tượng áp dụng (chỉ thành viên đã đăng nhập).

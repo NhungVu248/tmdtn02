@@ -25,6 +25,7 @@ import { CategoryPage } from './pages/CategoryPage'
 import { HomePage } from './pages/HomePage'
 import { SearchPage } from './pages/SearchPage'
 import { ProductDetailPage } from './pages/ProductDetailPage'
+import { TourDetailPage } from './pages/TourDetailPage'
 import { InfoArticlePage, InfoIndexPage } from './pages/InfoPages'
 import { RegisterPage } from './pages/RegisterPage'
 import { VerifyEmailPage } from './pages/VerifyEmailPage'
@@ -91,6 +92,8 @@ function App() {
           <Route path="search" element={<SearchPage />} />
           {/* UC-03 – Xem chi tiết & tình trạng còn trống */}
           <Route path="product/:slug" element={<ProductDetailPage />} />
+          {/* UC-03 – Chi tiết tour (bảng riêng) */}
+          <Route path="tour/:slug" element={<TourDetailPage />} />
           {/* UC-09/10 – Đặt homestay/tour (hỗ trợ guest checkout) + UC-11 thanh toán */}
           <Route path="booking/:slug" element={<BookingPage />} />
           <Route path="payment-result" element={<PaymentResultPage />} />

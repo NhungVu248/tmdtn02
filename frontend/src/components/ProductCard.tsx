@@ -4,10 +4,11 @@ import { FavoriteButton } from './FavoriteButton'
 
 // Thẻ sản phẩm. Bấm vào -> UC-03 (Xem chi tiết) theo luồng thay thế 3a.
 export function ProductCard({ product }: { product: Product }) {
-  const unit = product.type === 'HOMESTAY' ? '/đêm' : '/khách'
+  const isTour = product.type === 'TOUR'
+  const unit = isTour ? '/khách' : '/đêm'
   return (
     <Link
-      to={`/product/${product.slug}`}
+      to={isTour ? `/tour/${product.slug}` : `/product/${product.slug}`}
       className="group block overflow-hidden rounded-xl border border-slate-200 bg-white transition hover:shadow-md"
     >
       <div className="relative aspect-[4/3] overflow-hidden bg-slate-100">
@@ -20,9 +21,10 @@ export function ProductCard({ product }: { product: Product }) {
           />
         )}
         <span className="absolute left-2 top-2 rounded-full bg-black/60 px-2 py-0.5 text-xs font-medium text-white">
-          {product.type === 'HOMESTAY' ? 'Homestay' : 'Tour'}
+          {isTour ? 'Tour' : 'Homestay'}
         </span>
-        <FavoriteButton productId={product.id} className="absolute right-2 top-2" />
+        {/* UC-08: yêu thích hiện chỉ áp dụng cho homestay */}
+        {!isTour && <FavoriteButton productId={product.id} className="absolute right-2 top-2" />}
       </div>
       <div className="p-3">
         <h3 className="line-clamp-1 font-semibold text-slate-900">{product.name}</h3>

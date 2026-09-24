@@ -10,16 +10,28 @@ export async function applyDiscount(req, res, next) {
       return res.status(400).json({ message: 'Thiếu thông tin tính tiền để áp dụng mã' })
     }
 
-    let pid = productId ? Number(productId) : null
-    if (!pid && slug) {
-      const product = await prisma.product.findUnique({ where: { slug }, select: { id: true } })
-      pid = product?.id ?? null
+    // Homestay -> propertyId (Property); Tour -> tourId (Tour). Cho phép truyền slug để tự tra.
+    let propId = null
+    let tid = null
+    if (type === 'TOUR') {
+      tid = productId ? Number(productId) : null
+      if (!tid && slug) {
+        const tour = await prisma.tour.findUnique({ where: { slug }, select: { id: true } })
+        tid = tour?.id ?? null
+      }
+    } else {
+      propId = productId ? Number(productId) : null
+      if (!propId && slug) {
+        const property = await prisma.property.findUnique({ where: { slug }, select: { id: true } })
+        propId = property?.id ?? null
+      }
     }
 
     const result = await validateDiscount({
       code,
       type,
-      productId: pid,
+      propertyId: propId,
+      tourId: tid,
       subtotal: Number(subtotal),
       userId: req.user?.sub ?? null,
     })

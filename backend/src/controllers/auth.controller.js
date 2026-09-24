@@ -3,8 +3,7 @@ import jwt from 'jsonwebtoken'
 import { prisma } from '../lib/prisma.js'
 import {
   createResetToken,
-  createAndSendVerification,
-  devVerifyUrl,
+  createAndSendOtp,
   hashToken,
   sendReset,
 } from '../lib/verification.js'
@@ -93,19 +92,18 @@ export async function register(req, res, next) {
       data: { email, password: hashed, name, acceptedTerms: true, emailVerified: false },
     })
 
-    // Gửi email xác thực (bước 4). Ngoại lệ 4a: gửi lỗi -> vẫn tạo tài khoản, cho gửi lại.
+    // Gửi mã OTP về email (bước 4). Ngoại lệ 4a: gửi lỗi -> vẫn tạo tài khoản, cho gửi lại.
     try {
-      const url = await createAndSendVerification(user)
+      await createAndSendOtp(user)
       return res.status(201).json({
-        message: 'Đăng ký thành công. Vui lòng kiểm tra email để kích hoạt tài khoản.',
+        message: 'Đăng ký thành công. Mã xác thực (OTP) đã được gửi tới email của bạn.',
         emailSent: true,
         email: user.email,
-        devVerifyUrl: devVerifyUrl(url),
       })
     } catch (mailErr) {
-      console.error('Gửi email xác thực thất bại:', mailErr)
+      console.error('Gửi mã OTP thất bại:', mailErr)
       return res.status(201).json({
-        message: 'Tạo tài khoản thành công nhưng chưa gửi được email xác thực. Vui lòng thử gửi lại.',
+        message: 'Tạo tài khoản thành công nhưng chưa gửi được mã xác thực. Vui lòng thử gửi lại.',
         emailSent: false,
         email: user.email,
       })
@@ -115,28 +113,40 @@ export async function register(req, res, next) {
   }
 }
 
-// UC-05 – Xác thực email qua token (bước 5-6).
+// UC-05 – Xác thực email bằng MÃ OTP + email (bước 5-6).
 export async function verifyEmail(req, res, next) {
   try {
-    const token = (req.body && req.body.token) || req.query.token
-    if (!token) {
-      return res.status(400).json({ message: 'Thiếu mã xác thực' })
+    const email = req.body?.email
+    const code = String(req.body?.code || req.query?.code || '').trim()
+    if (!email || !EMAIL_RE.test(email)) {
+      return res.status(400).json({ message: 'Thiếu email hoặc email không hợp lệ' })
+    }
+    if (!/^\d{6}$/.test(code)) {
+      return res.status(400).json({ message: 'Mã OTP phải gồm 6 chữ số' })
     }
 
-    const record = await prisma.emailVerificationToken.findUnique({
-      where: { tokenHash: hashToken(String(token)) },
-      include: { user: true },
+    const user = await prisma.user.findUnique({ where: { email } })
+    if (!user) {
+      return res.status(400).json({ message: 'Mã xác thực không hợp lệ hoặc đã hết hạn' })
+    }
+    if (user.emailVerified) {
+      return res.json({ message: 'Tài khoản đã được xác thực. Bạn có thể đăng nhập.', email: user.email })
+    }
+
+    // Tìm mã OTP chưa dùng, còn hạn, khớp bản băm — của đúng user này.
+    const record = await prisma.emailVerificationToken.findFirst({
+      where: { userId: user.id, tokenHash: hashToken(code), usedAt: null, expiresAt: { gt: new Date() } },
     })
-    if (!record || record.usedAt || record.expiresAt < new Date()) {
-      return res.status(400).json({ message: 'Liên kết xác thực không hợp lệ hoặc đã hết hạn' })
+    if (!record) {
+      return res.status(400).json({ message: 'Mã xác thực không đúng hoặc đã hết hạn' })
     }
 
     await prisma.$transaction([
-      prisma.user.update({ where: { id: record.userId }, data: { emailVerified: true } }),
+      prisma.user.update({ where: { id: user.id }, data: { emailVerified: true } }),
       prisma.emailVerificationToken.update({ where: { id: record.id }, data: { usedAt: new Date() } }),
     ])
 
-    res.json({ message: 'Xác thực email thành công. Bạn có thể đăng nhập.', email: record.user.email })
+    res.json({ message: 'Xác thực email thành công. Bạn có thể đăng nhập.', email: user.email })
   } catch (err) {
     next(err)
   }
@@ -151,18 +161,18 @@ export async function resendVerification(req, res, next) {
     }
 
     const user = await prisma.user.findUnique({ where: { email } })
-    const generic = { message: 'Nếu email hợp lệ và chưa xác thực, chúng tôi đã gửi lại liên kết kích hoạt.' }
+    const generic = { message: 'Nếu email hợp lệ và chưa xác thực, chúng tôi đã gửi lại mã OTP.' }
 
     if (!user || user.emailVerified) {
       return res.json(generic)
     }
 
     try {
-      const url = await createAndSendVerification(user)
-      return res.json({ ...generic, devVerifyUrl: devVerifyUrl(url) })
+      await createAndSendOtp(user)
+      return res.json(generic)
     } catch (mailErr) {
-      console.error('Gửi lại email xác thực thất bại:', mailErr)
-      return res.status(502).json({ message: 'Không gửi được email xác thực. Vui lòng thử lại sau.' })
+      console.error('Gửi lại mã OTP thất bại:', mailErr)
+      return res.status(502).json({ message: 'Không gửi được mã xác thực. Vui lòng thử lại sau.' })
     }
   } catch (err) {
     next(err)

@@ -1,30 +1,84 @@
 import { prisma } from '../lib/prisma.js'
 
-// Chỉ chọn các trường cần cho danh sách/thẻ sản phẩm.
-const productCardSelect = {
+// Homestay nay ở bảng Property — chọn trường rồi ánh xạ về "thẻ" chung.
+const propertyCardSelect = {
   id: true,
   name: true,
   slug: true,
-  type: true,
-  location: true,
-  price: true,
-  rating: true,
+  address: true,
+  basePrice: true,
+  avgRating: true,
   thumbnail: true,
   isFeatured: true,
-  categoryId: true,
-  amenities: true,
+  provinceId: true,
+  areaId: true,
+}
+
+export function propertyToCard(p) {
+  return {
+    id: p.id,
+    name: p.name,
+    slug: p.slug,
+    type: 'HOMESTAY',
+    location: p.address || null,
+    price: p.basePrice,
+    rating: p.avgRating,
+    thumbnail: p.thumbnail,
+    isFeatured: p.isFeatured,
+    categoryId: p.areaId ?? p.provinceId ?? null,
+    amenities: null,
+    durationDays: null,
+  }
+}
+
+// Tour nay ở bảng riêng — chọn trường tương ứng rồi ánh xạ về cùng "thẻ" như homestay.
+const tourCardSelect = {
+  id: true,
+  title: true,
+  slug: true,
+  destination: true,
+  departurePoint: true,
+  basePrice: true,
+  avgRating: true,
+  thumbnail: true,
+  isFeatured: true,
   durationDays: true,
+  regionId: true,
+  themeId: true,
+}
+
+export function tourToCard(t) {
+  return {
+    id: t.id,
+    name: t.title,
+    slug: t.slug,
+    type: 'TOUR',
+    location: t.destination || t.departurePoint || null,
+    price: t.basePrice,
+    rating: t.avgRating,
+    thumbnail: t.thumbnail,
+    isFeatured: t.isFeatured,
+    categoryId: t.themeId ?? t.regionId ?? null,
+    amenities: null,
+    durationDays: t.durationDays,
+  }
 }
 
 // UC-01 – Dữ liệu trang chủ: nổi bật, khu vực phổ biến, khuyến mại.
 // BR-01: chỉ hiển thị sản phẩm trạng thái VISIBLE. Khuyến mại: chỉ active.
 export async function getHome(req, res, next) {
   try {
-    const [featured, areas, promotions] = await Promise.all([
-      prisma.product.findMany({
+    const [featuredHomestay, featuredTours, areas, promotions] = await Promise.all([
+      prisma.property.findMany({
         where: { status: 'VISIBLE', isFeatured: true },
-        select: productCardSelect,
-        orderBy: { rating: 'desc' },
+        select: propertyCardSelect,
+        orderBy: { avgRating: 'desc' },
+        take: 8,
+      }),
+      prisma.tour.findMany({
+        where: { status: 'VISIBLE', isFeatured: true },
+        select: tourCardSelect,
+        orderBy: { avgRating: 'desc' },
         take: 8,
       }),
       prisma.area.findMany({ orderBy: { order: 'asc' } }),
@@ -33,6 +87,11 @@ export async function getHome(req, res, next) {
         orderBy: { createdAt: 'desc' },
       }),
     ])
+
+    // Gộp homestay + tour nổi bật, sắp theo đánh giá, lấy tối đa 8.
+    const featured = [...featuredHomestay.map(propertyToCard), ...featuredTours.map(tourToCard)]
+      .sort((a, b) => b.rating - a.rating)
+      .slice(0, 8)
 
     res.json({
       featured,
@@ -107,6 +166,7 @@ export async function getProducts(req, res, next) {
     if (location) where.location = { contains: String(location) }
 
     let category = null
+    let catIds = null
     if (categoryId || categorySlug) {
       category = await prisma.category.findUnique({
         where: categoryId ? { id: Number(categoryId) } : { slug: String(categorySlug) },
@@ -114,15 +174,25 @@ export async function getProducts(req, res, next) {
       if (!category) {
         return res.status(404).json({ message: 'Không tìm thấy danh mục' })
       }
-      const ids = await collectCategoryIds(category.id)
-      where.categoryId = { in: ids }
+      catIds = await collectCategoryIds(category.id)
     }
 
-    const items = await prisma.product.findMany({
-      where,
-      select: productCardSelect,
-      orderBy: { createdAt: 'desc' },
-    })
+    // Tour ở bảng riêng: lọc theo region/theme thay vì categoryId.
+    if (type === 'TOUR' || category?.type === 'TOUR') {
+      const tourWhere = { status: 'VISIBLE' }
+      if (location) tourWhere.OR = [{ destination: { contains: String(location) } }, { departurePoint: { contains: String(location) } }]
+      if (catIds) tourWhere.OR = [{ regionId: { in: catIds } }, { themeId: { in: catIds } }]
+      const tours = await prisma.tour.findMany({ where: tourWhere, select: tourCardSelect, orderBy: { createdAt: 'desc' } })
+      const items = tours.map(tourToCard)
+      return res.json({ category, count: items.length, items })
+    }
+
+    // Homestay ở bảng Property: lọc theo province/area thay vì categoryId.
+    const propWhere = { status: 'VISIBLE' }
+    if (location) propWhere.address = { contains: String(location) }
+    if (catIds) propWhere.OR = [{ provinceId: { in: catIds } }, { areaId: { in: catIds } }]
+    const props = await prisma.property.findMany({ where: propWhere, select: propertyCardSelect, orderBy: { createdAt: 'desc' } })
+    const items = props.map(propertyToCard)
 
     res.json({ category, count: items.length, items })
   } catch (err) {
@@ -137,58 +207,6 @@ function diffNights(from, to) {
   if (isNaN(a) || isNaN(b)) return null
   const nights = Math.round((b - a) / 86400000)
   return nights
-}
-
-// UC-03 – Chi tiết sản phẩm + đánh giá + gợi ý tương tự.
-// Ngoại lệ 1a: sản phẩm không tồn tại hoặc đã bị gỡ (HIDDEN) -> không còn khả dụng.
-export async function getProductDetail(req, res, next) {
-  try {
-    const { slug } = req.params
-    const product = await prisma.product.findUnique({
-      where: { slug },
-      include: {
-        images: { orderBy: { order: 'asc' } },
-        category: true,
-        reviews: {
-          where: { approved: true }, // BR-08
-          orderBy: { createdAt: 'desc' },
-        },
-        departures: {
-          where: { date: { gte: startOfToday() } },
-          orderBy: { date: 'asc' },
-        },
-      },
-    })
-
-    if (!product || product.status !== 'VISIBLE') {
-      return res.status(404).json({ message: 'Sản phẩm không còn khả dụng' })
-    }
-
-    // Tour: kèm số chỗ còn của mỗi chuyến (BR-07).
-    const departures = product.departures.map((d) => ({
-      id: d.id,
-      date: d.date,
-      totalSeats: d.totalSeats,
-      seatsLeft: d.totalSeats - d.bookedSeats,
-    }))
-
-    // AF-07: gợi ý sản phẩm tương tự cùng loại & khu vực.
-    const similar = await prisma.product.findMany({
-      where: {
-        status: 'VISIBLE',
-        type: product.type,
-        id: { not: product.id },
-        ...(product.location ? { location: { contains: product.location.split(',')[0] } } : {}),
-      },
-      select: productCardSelect,
-      take: 4,
-    })
-
-    const { reviews, departures: _omit, ...rest } = product
-    res.json({ product: { ...rest, departures }, reviews, similar })
-  } catch (err) {
-    next(err)
-  }
 }
 
 const DAY_MS = 86400000
@@ -213,107 +231,6 @@ function nightsBetween(from, to) {
   const dates = []
   for (let t = a.getTime(); t < b.getTime(); t += DAY_MS) dates.push(new Date(t))
   return dates
-}
-
-// UC-03 – Kiểm tra tình trạng còn trống + giá tạm tính (BR-07, BR-09).
-export async function checkAvailability(req, res, next) {
-  try {
-    const { slug } = req.params
-    const product = await prisma.product.findUnique({ where: { slug } })
-    if (!product || product.status !== 'VISIBLE') {
-      return res.status(404).json({ message: 'Sản phẩm không còn khả dụng' })
-    }
-
-    const guests = req.query.guests ? Number(req.query.guests) : 1
-    if (!Number.isInteger(guests) || guests < 1) {
-      return res.status(400).json({ message: 'Số khách phải là số nguyên ≥ 1' })
-    }
-
-    if (product.type === 'HOMESTAY') {
-      const { from, to } = req.query
-      if (!from || !to) {
-        return res.status(400).json({ message: 'Vui lòng chọn ngày nhận và trả phòng' })
-      }
-      const nights = nightsBetween(from, to)
-      if (!nights) return res.status(400).json({ message: 'Ngày không hợp lệ' })
-      if (nights.length === 0) {
-        return res.status(400).json({ message: 'Ngày trả phòng phải sau ngày nhận phòng' })
-      }
-
-      const rows = await prisma.homestayAvailability.findMany({
-        where: { productId: product.id, date: { gte: nights[0], lte: nights[nights.length - 1] } },
-      })
-      // Cột @db.Date trả về Date tại UTC midnight -> khớp trực tiếp với night.getTime().
-      const byTime = new Map(rows.map((r) => [new Date(r.date).getTime(), r]))
-
-      let minRooms = Infinity
-      for (const night of nights) {
-        const row = byTime.get(night.getTime())
-        const free = row ? row.totalRooms - row.bookedRooms : 0
-        minRooms = Math.min(minRooms, free)
-      }
-      const available = minRooms >= 1
-      // BR-77: dùng giá riêng theo ngày (mùa/cuối tuần) do UC-16 thiết lập nếu có, ngược lại giá cơ bản.
-      const tentativePrice = available
-        ? nights.reduce((sum, night) => {
-            const row = byTime.get(night.getTime())
-            return sum + (row?.priceOverride ?? product.price)
-          }, 0)
-        : null
-      return res.json({
-        type: 'HOMESTAY',
-        available,
-        nights: nights.length,
-        roomsLeft: available ? minRooms : 0,
-        tentativePrice, // BR-09/BR-77
-        message: available ? null : 'Không còn chỗ trống trong khoảng ngày đã chọn',
-      })
-    }
-
-    // TOUR
-    const { date, children } = req.query
-    if (!date) {
-      return res.status(400).json({ message: 'Vui lòng chọn ngày khởi hành' })
-    }
-    const numChildren = children ? Number(children) : 0
-    if (!Number.isInteger(numChildren) || numChildren < 0) {
-      return res.status(400).json({ message: 'Số trẻ em không hợp lệ' })
-    }
-    const day = parseUtcDate(date)
-    if (!day) return res.status(400).json({ message: 'Ngày khởi hành không hợp lệ' })
-    const nextDay = new Date(day.getTime() + DAY_MS)
-
-    const departure = await prisma.tourDeparture.findFirst({
-      where: { productId: product.id, date: { gte: day, lt: nextDay } },
-    })
-    // BR-79: chuyến đã đóng cũng coi như không mở để đặt.
-    if (!departure || departure.closed) {
-      return res.json({
-        type: 'TOUR',
-        available: false,
-        seatsLeft: 0,
-        tentativePrice: null,
-        message: 'Không có chuyến khởi hành vào ngày đã chọn',
-      })
-    }
-
-    const seatsLeft = departure.totalSeats - departure.bookedSeats
-    const totalGuests = guests + numChildren
-    const available = seatsLeft >= totalGuests
-    // BR-83: ưu tiên giá riêng theo chuyến (do UC-17 thiết lập) trước giá cơ bản của sản phẩm.
-    const adultPrice = departure.priceAdultOverride ?? product.price
-    const childPrice = departure.priceChildOverride ?? product.priceChild ?? product.price
-    const tentativePrice = available ? adultPrice * guests + childPrice * numChildren : null // BR-09/BR-83
-    return res.json({
-      type: 'TOUR',
-      available,
-      seatsLeft,
-      tentativePrice,
-      message: available ? null : 'Không còn đủ chỗ cho chuyến đã chọn',
-    })
-  } catch (err) {
-    next(err)
-  }
 }
 
 // UC-02 – Tìm kiếm & lọc sản phẩm.
@@ -355,24 +272,26 @@ export async function searchProducts(req, res, next) {
       }
     }
 
-    // ----- Tập cơ sở cho facets (BR-04: VISIBLE) -----
-    const baseWhere = { status: 'VISIBLE' }
-    if (type === 'HOMESTAY' || type === 'TOUR') baseWhere.type = type
-    if (destination) baseWhere.location = { contains: String(destination) }
-
-    const base = await prisma.product.findMany({
-      where: baseWhere,
-      select: productCardSelect,
-    })
+    // ----- Tập cơ sở cho facets (BR-04: VISIBLE), gộp homestay (Product) + tour (Tour) -----
+    let base = []
+    if (type !== 'TOUR') {
+      const w = { status: 'VISIBLE' }
+      if (destination) w.address = { contains: String(destination) }
+      const props = await prisma.property.findMany({ where: w, select: { ...propertyCardSelect, amenities: { select: { amenity: { select: { name: true } } } } } })
+      base.push(...props.map((p) => ({ ...propertyToCard(p), amenityList: p.amenities.map((a) => a.amenity.name) })))
+    }
+    if (type !== 'HOMESTAY') {
+      const w = { status: 'VISIBLE' }
+      if (destination) w.OR = [{ destination: { contains: String(destination) } }, { departurePoint: { contains: String(destination) } }]
+      const tours = await prisma.tour.findMany({ where: w, select: tourCardSelect })
+      base.push(...tours.map((t) => ({ ...tourToCard(t), amenityList: [] })))
+    }
 
     // ----- Facets (tùy chọn bộ lọc dựa trên dữ liệu thực) -----
+    const allAmenities = await prisma.amenity.findMany({ select: { name: true }, orderBy: { name: 'asc' } })
     const facets = {
       locations: [...new Set(base.map((p) => p.location).filter(Boolean))].sort(),
-      amenities: [
-        ...new Set(
-          base.flatMap((p) => (p.amenities ? p.amenities.split(',').map((s) => s.trim()) : [])),
-        ),
-      ].sort(),
+      amenities: allAmenities.map((a) => a.name),
       durations: [...new Set(base.map((p) => p.durationDays).filter((d) => d != null))].sort(
         (a, b) => a - b,
       ),
@@ -395,7 +314,7 @@ export async function searchProducts(req, res, next) {
       if (minRating && p.rating < Number(minRating)) return false
       if (wantedDurations.length && !wantedDurations.includes(p.durationDays)) return false
       if (wantedAmenities.length) {
-        const have = (p.amenities || '').split(',').map((s) => s.trim())
+        const have = p.amenityList || []
         if (!wantedAmenities.every((a) => have.includes(a))) return false
       }
       return true
@@ -410,7 +329,7 @@ export async function searchProducts(req, res, next) {
     if (sorters[sort]) items = [...items].sort(sorters[sort])
 
     // ----- BR-05: giá theo số đêm cho homestay -----
-    const result = items.map((p) => {
+    const result = items.map(({ amenityList, ...p }) => {
       if (nights && p.type === 'HOMESTAY') {
         return { ...p, nights, totalPrice: p.price * nights }
       }

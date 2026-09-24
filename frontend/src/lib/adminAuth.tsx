@@ -1,5 +1,5 @@
-import { createContext, useContext, useMemo, useState, type ReactNode } from 'react'
-import { setAdminToken, type AdminInfo } from './adminApi'
+import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { setAdminToken, setAdminUnauthorizedHandler, type AdminInfo } from './adminApi'
 
 // UC-24 (BR-67) – Phiên quản trị hoàn toàn tách biệt khỏi AuthProvider (Customer):
 // khóa localStorage riêng, context riêng, không chia sẻ state với website chính.
@@ -31,6 +31,22 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
     return stored?.token ?? null
   })
   const [admin, setAdmin] = useState<AdminInfo | null>(() => readStored()?.admin ?? null)
+
+  // Khi API trả 401 (phiên hết hạn) ở bất kỳ thao tác nào: xóa phiên + đưa về trang đăng nhập admin
+  // kèm cờ ?expired=1 để báo cho người dùng biết cần đăng nhập lại (tránh cảm giác "lưu không được").
+  useEffect(() => {
+    setAdminUnauthorizedHandler(() => {
+      try {
+        localStorage.removeItem(STORAGE_KEY)
+      } catch {
+        // bỏ qua
+      }
+      setAdminToken(null)
+      if (!window.location.pathname.endsWith('/admin/login')) {
+        window.location.href = '/admin/login?expired=1'
+      }
+    })
+  }, [])
 
   const value = useMemo<AdminAuthState>(
     () => ({

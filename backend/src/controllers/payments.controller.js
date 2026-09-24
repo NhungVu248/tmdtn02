@@ -17,7 +17,7 @@ export async function getPaymentStatus(req, res, next) {
   try {
     const booking = await prisma.booking.findUnique({
       where: { code: req.params.code },
-      include: { product: { select: { name: true } } },
+      include: { property: { select: { name: true } }, tour: { select: { title: true } } },
     })
     if (!booking) return res.status(404).json({ message: 'Không tìm thấy đơn' })
     res.json({
@@ -27,7 +27,7 @@ export async function getPaymentStatus(req, res, next) {
       totalPrice: booking.totalPrice,
       depositAmount: booking.depositAmount,
       remainingAmount: booking.remainingAmount,
-      productName: booking.product.name,
+      productName: booking.tour?.title ?? booking.property?.name ?? "",
     })
   } catch (err) {
     next(err)

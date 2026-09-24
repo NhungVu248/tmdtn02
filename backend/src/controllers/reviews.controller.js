@@ -15,7 +15,14 @@ export async function getReviewContext(req, res, next) {
     const token = String(req.params.token || '')
     const row = await prisma.reviewToken.findUnique({
       where: { tokenHash: hashReviewToken(token) },
-      include: { booking: { include: { product: { select: { name: true, slug: true, thumbnail: true } } } } },
+      include: {
+        booking: {
+          include: {
+            property: { select: { name: true, slug: true, thumbnail: true } },
+            tour: { select: { title: true, slug: true, thumbnail: true } },
+          },
+        },
+      },
     })
     if (!row) {
       return res.status(404).json({ message: 'Liên kết đánh giá không hợp lệ' }) // 4b
@@ -27,11 +34,12 @@ export async function getReviewContext(req, res, next) {
     if (existing) {
       return res.status(409).json({ message: 'Đơn này đã được đánh giá trước đó' }) // 4a
     }
+    const b = row.booking
     res.json({
-      productName: row.booking.product.name,
-      productSlug: row.booking.product.slug,
-      thumbnail: row.booking.product.thumbnail,
-      bookingCode: row.booking.code,
+      productName: b.tour?.title ?? b.property?.name ?? '',
+      productSlug: b.tour?.slug ?? b.property?.slug ?? '',
+      thumbnail: b.tour?.thumbnail ?? b.property?.thumbnail ?? null,
+      bookingCode: b.code,
     })
   } catch (err) {
     next(err)
@@ -68,7 +76,9 @@ export async function createGuestReview(req, res, next) {
     await prisma.$transaction([
       prisma.review.create({
         data: {
-          productId: booking.productId,
+          productType: booking.type,
+          propertyId: booking.tourId ? null : booking.propertyId,
+          tourId: booking.tourId ?? null,
           bookingId: booking.id,
           authorName: booking.guestName,
           rating: Number(rating),
@@ -108,7 +118,9 @@ export async function createMyReview(req, res, next) {
     const user = await prisma.user.findUnique({ where: { id: req.user.sub }, select: { name: true, email: true } })
     await prisma.review.create({
       data: {
-        productId: completed.productId,
+        productType: completed.type,
+        propertyId: completed.tourId ? null : completed.propertyId,
+        tourId: completed.tourId ?? null,
         bookingId: completed.id,
         authorName: user?.name || completed.guestName,
         rating: Number(rating),

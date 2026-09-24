@@ -17,8 +17,8 @@ function summary(b) {
     code: b.code,
     type: b.type,
     status: b.status,
-    productName: b.product.name,
-    productSlug: b.product.slug,
+    productName: b.tour?.title ?? b.property?.name ?? "",
+    productSlug: b.tour?.slug ?? b.property?.slug ?? "",
     guestName: b.guestName,
     guestEmail: b.guestEmail,
     guestPhone: b.guestPhone,
@@ -57,7 +57,7 @@ export async function listOrders(req, res, next) {
 
     const bookings = await prisma.booking.findMany({
       where,
-      include: { product: { select: { name: true, slug: true } } },
+      include: { property: { select: { name: true, slug: true } }, tour: { select: { title: true, slug: true } } },
       orderBy: { createdAt: 'desc' },
       take: 300,
     })
@@ -74,7 +74,8 @@ export async function getOrder(req, res, next) {
     const booking = await prisma.booking.findUnique({
       where: { code },
       include: {
-        product: { select: { name: true, slug: true, type: true } },
+        property: { select: { name: true, slug: true } },
+        tour: { select: { title: true, slug: true } },
         payments: { orderBy: { createdAt: 'desc' } },
         refundRequests: { orderBy: { createdAt: 'desc' } },
       },
@@ -104,25 +105,24 @@ async function releaseInventoryOps(booking) {
   const ops = []
   if (booking.type === 'HOMESTAY' && booking.checkIn && booking.checkOut) {
     const nights = nightsBetween(booking.checkIn.toISOString(), booking.checkOut.toISOString())
-    if (nights?.length) {
+    if (nights?.length && booking.roomTypeId) {
       ops.push(
-        prisma.homestayAvailability.updateMany({
-          where: { productId: booking.productId, date: { in: nights }, bookedRooms: { gt: 0 } },
+        prisma.roomInventory.updateMany({
+          where: { roomTypeId: booking.roomTypeId, date: { in: nights }, bookedRooms: { gt: 0 } },
           data: { bookedRooms: { decrement: 1 } },
         }),
       )
     }
-  } else if (booking.type === 'TOUR' && booking.checkIn) {
-    const nextDay = new Date(booking.checkIn.getTime() + 86400000)
-    const departure = await prisma.tourDeparture.findFirst({
-      where: { productId: booking.productId, date: { gte: booking.checkIn, lt: nextDay } },
-    })
+  } else if (booking.type === 'TOUR') {
+    const departure = booking.tourDepartureId
+      ? await prisma.tourDeparture.findUnique({ where: { id: booking.tourDepartureId } })
+      : null
     if (departure) {
       const seats = (booking.guests || 0) + (booking.children || 0)
       ops.push(
         prisma.tourDeparture.update({
           where: { id: departure.id },
-          data: { bookedSeats: { decrement: Math.min(seats, departure.bookedSeats) } },
+          data: { bookedSlots: { decrement: Math.min(seats, departure.bookedSlots) } },
         }),
       )
     }
@@ -136,7 +136,7 @@ export async function updateOrderStatus(req, res, next) {
   try {
     const code = String(req.params.code || '').trim().toUpperCase()
     const { status } = req.body
-    const booking = await prisma.booking.findUnique({ where: { code }, include: { product: true } })
+    const booking = await prisma.booking.findUnique({ where: { code }, include: { property: true, tour: true } })
     if (!booking) return res.status(404).json({ message: 'Không tìm thấy đơn' })
 
     const allowed = TRANSITIONS[booking.status] || []
@@ -168,11 +168,11 @@ export async function updateOrderStatus(req, res, next) {
     })
 
     // BR-90: thông báo cho người dùng khi trạng thái đơn thay đổi (gửi nền, không chặn response).
-    sendOrderStatusEmail(booking.guestEmail, { code: booking.code, productName: booking.product.name, status }).catch(
+    sendOrderStatusEmail(booking.guestEmail, { code: booking.code, productName: booking.tour?.title ?? booking.property?.name ?? "", status }).catch(
       (e) => console.error('Gửi email cập nhật đơn thất bại:', e),
     )
 
-    res.json({ order: { ...summary({ ...booking, ...updated, product: booking.product }), allowedTransitions: TRANSITIONS[updated.status] || [] } })
+    res.json({ order: { ...summary({ ...booking, ...updated, property: booking.property, tour: booking.tour }), allowedTransitions: TRANSITIONS[updated.status] || [] } })
   } catch (err) {
     next(err)
   }
@@ -186,7 +186,7 @@ export async function processRefund(req, res, next) {
     const refundId = Number(req.params.refundId)
     const { amount, referenceCode } = req.body || {}
 
-    const booking = await prisma.booking.findUnique({ where: { code }, include: { product: true } })
+    const booking = await prisma.booking.findUnique({ where: { code }, include: { property: true, tour: true } })
     if (!booking) return res.status(404).json({ message: 'Không tìm thấy đơn' })
 
     const refund = await prisma.refundRequest.findFirst({ where: { id: refundId, bookingId: booking.id } })
@@ -215,7 +215,7 @@ export async function processRefund(req, res, next) {
 
     sendRefundProcessedEmail(booking.guestEmail, {
       code: booking.code,
-      productName: booking.product.name,
+      productName: booking.tour?.title ?? booking.property?.name ?? '',
       amount: refund.amount,
       referenceCode: referenceCode || null,
     }).catch((e) => console.error('Gửi email hoàn tiền thất bại:', e))

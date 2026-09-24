@@ -17,6 +17,63 @@ enum ProductStatus {
   HIDDEN
 }
 
+// ===== Tour (bảng riêng, tách khỏi Product) — thiết kế theo dữ liệu đặc tả tour =====
+enum TourStatus {
+  DRAFT // nháp, chưa công bố
+  VISIBLE // BR-79: đang hiển thị
+  HIDDEN // đã ẩn
+}
+
+enum DepartureStatus {
+  OPEN // còn mở bán
+  CLOSED // admin đóng (UC-17 4a)
+  FULL // hết chỗ
+  CANCELLED // hủy chuyến
+}
+
+enum PaxType {
+  ADULT
+  CHILD
+  INFANT
+}
+
+enum InclusionType {
+  INCLUDED // bao gồm
+  EXCLUDED // không bao gồm
+}
+
+enum TourNoteType {
+  TERM // điều khoản / cần biết trước khi đặt
+  FAQ // câu hỏi thường gặp
+  REDEMPTION // hướng dẫn sử dụng vé/redemption
+}
+
+// ===== Property (chỗ nghỉ — bảng riêng, mô hình 3 tầng Property→RoomType→RoomInventory) =====
+enum PropertyType {
+  HOMESTAY
+  HOTEL
+  VILLA
+  APARTMENT
+  RESORT
+}
+
+enum PropertyStatus {
+  DRAFT
+  VISIBLE // BR-73
+  HIDDEN
+}
+
+enum AmenityScope {
+  GENERAL // tiện nghi chung của chỗ nghỉ
+  ROOM // tiện nghi theo phòng
+}
+
+enum PropertyPolicyType {
+  HOUSE_RULE // nội quy (vd xuất trình giấy tờ khi nhận phòng)
+  NOTE // ghi chú
+  FAQ // câu hỏi thường gặp
+}
+
 // Nhóm D – Quản trị (khu vực /admin, hoàn toàn tách biệt khỏi User của website chính).
 enum AdminRole {
   SUPER_ADMIN // toàn quyền, bao gồm UC-19 cấp quyền cho admin khác
@@ -37,6 +94,8 @@ model Admin {
 
   loginAttempts AdminLoginAttempt[]
   auditLogs     AdminAuditLog[]
+  tours         Tour[]
+  properties    Property[]
 
   @@index([role])
 }
@@ -135,10 +194,19 @@ model Booking {
   type    BookingType
   status  BookingStatus @default(PENDING_DEPOSIT)
 
-  productId Int
-  product   Product @relation(fields: [productId], references: [id])
-  userId    Int? // null nếu đặt với tư cách khách (guest checkout)
-  user      User?   @relation(fields: [userId], references: [id])
+  // Đa hình: đơn homestay trỏ propertyId + roomTypeId; đơn tour trỏ tourId + tourDepartureId.
+  // (productId là di sản của bảng Product cũ, giữ nullable để tương thích trong quá trình di trú.)
+  productId       Int? // (cũ, sẽ bỏ)
+  product         Product? @relation(fields: [productId], references: [id])
+  propertyId      Int? // homestay/chỗ nghỉ
+  property        Property? @relation(fields: [propertyId], references: [id])
+  roomTypeId      Int? // loại phòng đã đặt
+  roomType        RoomType? @relation(fields: [roomTypeId], references: [id])
+  tourId          Int? // tour
+  tour            Tour?    @relation(fields: [tourId], references: [id])
+  tourDepartureId Int? // chuyến khởi hành cụ thể của đơn tour
+  userId          Int? // null nếu đặt với tư cách khách (guest checkout)
+  user            User?    @relation(fields: [userId], references: [id])
 
   // Thông tin liên hệ của người đặt
   guestName  String
@@ -186,6 +254,8 @@ model Booking {
   reviewToken ReviewToken?
 
   @@index([productId])
+  @@index([propertyId])
+  @@index([tourId])
   @@index([userId])
   @@index([status])
 }
@@ -222,8 +292,12 @@ model DiscountCode {
   value         Int // % (1-100) nếu PERCENT, hoặc số tiền VND nếu FIXED
   minOrderValue Int       @default(0)
   scope         String    @default("ALL") // ALL | HOMESTAY | TOUR
-  productId     Int? // tùy chọn: giới hạn cho 1 sản phẩm cụ thể
+  productId     Int? // (cũ) Product
   product       Product?  @relation(fields: [productId], references: [id])
+  propertyId    Int? // tùy chọn: giới hạn cho 1 chỗ nghỉ cụ thể
+  property      Property? @relation(fields: [propertyId], references: [id])
+  tourId        Int? // tùy chọn: giới hạn cho 1 tour cụ thể
+  tour          Tour?     @relation(fields: [tourId], references: [id])
   audience      String    @default("ALL") // ALL | CUSTOMER (chỉ thành viên đã đăng nhập)
   startAt       DateTime?
   endAt         DateTime?
@@ -254,11 +328,17 @@ model Favorite {
   id        Int      @id @default(autoincrement())
   userId    Int
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  productId Int
-  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  productId Int? // (cũ) Product
+  product   Product? @relation(fields: [productId], references: [id], onDelete: Cascade)
+  propertyId Int? // homestay/chỗ nghỉ
+  property  Property? @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  tourId    Int? // tour
+  tour      Tour?    @relation(fields: [tourId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
 
   @@unique([userId, productId])
+  @@unique([userId, propertyId])
+  @@unique([userId, tourId])
   @@index([userId])
 }
 
@@ -305,11 +385,16 @@ model Category {
   name      String
   slug      String      @unique
   type      ProductType
+  kind      String? // với danh mục tour: 'region' | 'theme' | 'duration' (BF-02)
   order     Int         @default(0)
   parentId  Int?
   parent    Category?   @relation("CategoryTree", fields: [parentId], references: [id])
   children  Category[]  @relation("CategoryTree")
   products  Product[]
+  toursAsRegion Tour[]  @relation("TourRegion")
+  toursAsTheme  Tour[]  @relation("TourTheme")
+  propertiesAsProvince Property[] @relation("PropertyProvince")
+  propertiesAsArea     Property[] @relation("PropertyArea")
   createdAt DateTime    @default(now())
 
   @@index([parentId])
@@ -332,16 +417,17 @@ model Product {
   amenities   String? // tiện nghi homestay, phân tách bằng dấu phẩy
   durationDays Int? // thời lượng tour (số ngày)
   priceChild  Int? // giá trẻ em cho tour (BR-09)
-  cancellationPolicy String? @db.Text // chính sách hủy
-  itinerary   String?       @db.Text // lịch trình tour
-  included    String?       @db.Text // UC-17: mục bao gồm (mỗi dòng một mục)
-  excluded    String?       @db.Text // UC-17: mục không bao gồm
+  cancellationPolicy String? @db.Text // chính sách hủy (text công bố; homestay)
+  cancellationPolicyId Int? // UC-14/23: chính sách hủy dạng bảng (null = dùng cấu hình mặc định UC-23)
+  cancellationPolicyRef CancellationPolicy? @relation(fields: [cancellationPolicyId], references: [id])
+  itinerary   String?       @db.Text // (cũ) lịch trình tour — sẽ bỏ sau khi tách Tour
+  included    String?       @db.Text // (cũ) mục bao gồm
+  excluded    String?       @db.Text // (cũ) mục không bao gồm
   categoryId  Int?
   category    Category?     @relation(fields: [categoryId], references: [id])
   images         ProductImage[]
   reviews        Review[]
   availabilities HomestayAvailability[]
-  departures     TourDeparture[]
   favorites      Favorite[]
   bookings       Booking[]
   discountCodes  DiscountCode[]
@@ -367,19 +453,26 @@ model ProductImage {
 
 // Đánh giá của khách. BR-08/BR-63: chỉ hiển thị đánh giá đã được duyệt.
 model Review {
-  id         Int      @id @default(autoincrement())
-  productId  Int
-  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
-  bookingId  Int?     @unique // UC-15/BR-61: gắn với đơn đã hoàn tất, mỗi đơn chỉ đánh giá 1 lần
-  booking    Booking? @relation(fields: [bookingId], references: [id])
-  authorName String
-  rating     Int
-  comment    String?  @db.Text
-  approved   Boolean  @default(false)
-  rejected   Boolean  @default(false) // UC-21/BR-104: từ chối/ẩn — phân biệt với "chờ kiểm duyệt" (cả 2 đều approved=false)
-  createdAt  DateTime @default(now())
+  id          Int         @id @default(autoincrement())
+  productType ProductType @default(HOMESTAY) // đa hình: HOMESTAY -> propertyId, TOUR -> tourId
+  productId   Int? // (cũ) Product
+  product     Product?    @relation(fields: [productId], references: [id], onDelete: Cascade)
+  propertyId  Int? // homestay/chỗ nghỉ
+  property    Property?   @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  tourId      Int? // tour
+  tour        Tour?       @relation(fields: [tourId], references: [id], onDelete: Cascade)
+  bookingId   Int?        @unique // UC-15/BR-61: gắn với đơn đã hoàn tất, mỗi đơn chỉ đánh giá 1 lần
+  booking     Booking?    @relation(fields: [bookingId], references: [id])
+  authorName  String
+  rating      Int
+  comment     String?     @db.Text
+  approved    Boolean     @default(false)
+  rejected    Boolean     @default(false) // UC-21/BR-104: từ chối/ẩn — phân biệt với "chờ kiểm duyệt" (cả 2 đều approved=false)
+  createdAt   DateTime    @default(now())
 
   @@index([productId])
+  @@index([propertyId])
+  @@index([tourId])
   @@index([approved])
 }
 
@@ -408,20 +501,312 @@ model HomestayAvailability {
   @@index([productId])
 }
 
-// Chuyến khởi hành của tour (BR-07).
-// UC-17 – Chuyến khởi hành. BR-80/83: số chỗ + giá theo loại khách do admin thiết lập theo từng chuyến.
-model TourDeparture {
-  id                  Int      @id @default(autoincrement())
-  productId           Int
-  product             Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
-  date                DateTime @db.Date
-  totalSeats          Int
-  bookedSeats         Int      @default(0)
-  priceAdultOverride  Int? // null = dùng Product.price
-  priceChildOverride  Int? // null = dùng Product.priceChild (hoặc price nếu không có)
-  closed              Boolean  @default(false) // UC-17 (4a): đóng/hủy chuyến chưa có khách
+// ===== Chính sách hủy dạng bảng (UC-14/UC-23, BR-55/114) — dùng chung Homestay & Tour =====
+// Thể hiện nhãn kiểu "Easy Refund / Non-refundable"; các mốc do PolicyMilestone định nghĩa.
+model CancellationPolicy {
+  id           Int               @id @default(autoincrement())
+  name         String
+  isRefundable Boolean           @default(true)
+  freeHours    Int               @default(24) // miễn phí hủy trong X giờ đầu sau khi đặt
+  milestones   PolicyMilestone[]
+  products     Product[]
+  tours        Tour[]
+  properties   Property[]
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+}
 
-  @@index([productId])
+// Mốc hoàn tiền: hủy trước >= daysBefore ngày -> hoàn refundRate%. Lấy mốc lớn nhất thỏa mãn.
+model PolicyMilestone {
+  id         Int                @id @default(autoincrement())
+  policyId   Int
+  policy     CancellationPolicy @relation(fields: [policyId], references: [id], onDelete: Cascade)
+  daysBefore Int // số ngày trước khởi hành/nhận phòng
+  refundRate Int // % hoàn (0-100)
+
+  @@index([policyId])
+}
+
+// ===== TOUR — bảng chính (thông tin mô tả), tách hoàn toàn khỏi Product =====
+model Tour {
+  id                   Int         @id @default(autoincrement())
+  tourCode             String      @unique // mã tour nội bộ
+  title                String
+  slug                 String      @unique // BF-37: đường dẫn SEO
+  shortDescription     String? // tagline/mô tả ngắn
+  description          String?     @db.Text
+  highlights           String?     @db.Text // [Mở rộng] điểm nổi bật (mỗi dòng một mục)
+  regionId             Int? // FK Category (kind=region)
+  region               Category?   @relation("TourRegion", fields: [regionId], references: [id])
+  themeId              Int? // FK Category (kind=theme)
+  theme                Category?   @relation("TourTheme", fields: [themeId], references: [id])
+  durationDays         Int         @default(1)
+  durationNights       Int         @default(0)
+  departurePoint       String? // điểm khởi hành/đón
+  destination          String? // điểm đến chính
+  meetingPoint         String?     @db.Text // [Mở rộng] điểm tập trung + hướng dẫn
+  minPax               Int         @default(1)
+  maxPax               Int         @default(30)
+  guideLanguage        String? // [Mở rộng] ngôn ngữ hướng dẫn
+  basePrice            Int // giá tham khảo (từ mức thấp nhất)
+  depositRate          Int? // % cọc riêng; null = lấy từ cấu hình UC-23 (BR-113)
+  cancellationPolicyId Int?
+  cancellationPolicy   CancellationPolicy? @relation(fields: [cancellationPolicyId], references: [id])
+  avgRating            Float       @default(0)
+  reviewCount          Int         @default(0)
+  status               TourStatus  @default(DRAFT) // BR-79: mặc định nháp/ẩn
+  thumbnail            String?
+  isFeatured           Boolean     @default(false)
+  metaTitle            String? // BF-36 SEO
+  metaDescription      String? // BF-36 SEO
+  createdById          Int? // FK Admin (người tạo)
+  createdBy            Admin?      @relation(fields: [createdById], references: [id])
+  createdAt            DateTime    @default(now())
+  updatedAt            DateTime    @updatedAt
+
+  images      TourImage[]
+  departures  TourDeparture[]
+  itinerary   TourItinerary[]
+  inclusions  TourInclusion[]
+  notes       TourNote[]
+  reviews     Review[]
+  favorites   Favorite[]
+  bookings    Booking[]
+  discountCodes DiscountCode[]
+
+  @@index([status])
+  @@index([regionId])
+  @@index([themeId])
+  @@index([isFeatured])
+}
+
+// Thư viện ảnh của tour.
+model TourImage {
+  id        Int     @id @default(autoincrement())
+  tourId    Int
+  tour      Tour    @relation(fields: [tourId], references: [id], onDelete: Cascade)
+  url       String
+  caption   String?
+  isCover   Boolean @default(false)
+  sortOrder Int     @default(0)
+
+  @@index([tourId])
+}
+
+// Chuyến khởi hành (đặc trưng cốt lõi của tour). BR-80/81.
+model TourDeparture {
+  id            Int             @id @default(autoincrement())
+  tourId        Int
+  tour          Tour            @relation(fields: [tourId], references: [id], onDelete: Cascade)
+  departureDate DateTime        @db.Date // BR-80
+  returnDate    DateTime?       @db.Date // suy ra từ thời lượng
+  totalSlots    Int // BR-81
+  bookedSlots   Int             @default(0)
+  heldSlots     Int             @default(0) // UC-10: giữ chỗ tạm
+  status        DepartureStatus @default(OPEN)
+  guideName     String? // [Mở rộng] hướng dẫn viên phụ trách
+  prices        TourPrice[]
+
+  @@index([tourId])
+}
+
+// Giá theo loại khách, gắn với chuyến khởi hành (BR-33). availableSlots = total-booked-held (tính ở tầng ứng dụng).
+model TourPrice {
+  id            Int           @id @default(autoincrement())
+  departureId   Int
+  departure     TourDeparture @relation(fields: [departureId], references: [id], onDelete: Cascade)
+  paxType       PaxType
+  price         Int
+  description   String? // vd "Trẻ em 5–11 tuổi"
+  requiresProof Boolean       @default(false) // [Mở rộng] vé ưu đãi cần chứng minh
+
+  @@unique([departureId, paxType])
+  @@index([departureId])
+}
+
+// Lịch trình theo ngày.
+model TourItinerary {
+  id            Int     @id @default(autoincrement())
+  tourId        Int
+  tour          Tour    @relation(fields: [tourId], references: [id], onDelete: Cascade)
+  dayNumber     Int
+  title         String?
+  description   String? @db.Text
+  meals         String? // bữa ăn bao gồm (sáng/trưa/tối)
+  accommodation String? // nơi nghỉ đêm đó
+
+  @@index([tourId])
+}
+
+// Bao gồm / không bao gồm.
+model TourInclusion {
+  id        Int           @id @default(autoincrement())
+  tourId    Int
+  tour      Tour          @relation(fields: [tourId], references: [id], onDelete: Cascade)
+  type      InclusionType
+  itemText  String
+  sortOrder Int           @default(0)
+
+  @@index([tourId])
+}
+
+// [Mở rộng] "Cần biết trước khi đặt": điều khoản, hướng dẫn dùng vé, FAQ.
+model TourNote {
+  id      Int          @id @default(autoincrement())
+  tourId  Int
+  tour    Tour         @relation(fields: [tourId], references: [id], onDelete: Cascade)
+  type    TourNoteType
+  title   String?
+  content String       @db.Text
+  sortOrder Int        @default(0)
+
+  @@index([tourId])
+}
+
+// ===== PROPERTY — chỗ nghỉ (bảng chính, tách khỏi Product) =====
+model Property {
+  id                   Int            @id @default(autoincrement())
+  propertyCode         String         @unique
+  name                 String
+  slug                 String         @unique // BF-37
+  propertyType         PropertyType   @default(HOMESTAY)
+  starRating           Int? // [Mở rộng] hạng sao
+  shortDescription     String?
+  description          String?        @db.Text
+  provinceId           Int? // FK Category (kind=province)
+  province             Category?      @relation("PropertyProvince", fields: [provinceId], references: [id])
+  areaId               Int? // FK Category (kind=area)
+  area                 Category?      @relation("PropertyArea", fields: [areaId], references: [id])
+  address              String?
+  latitude             Float? // [Mở rộng] SF-02
+  longitude            Float? // [Mở rộng]
+  checkInTime          String? // giờ nhận phòng "14:00"
+  checkOutTime         String? // giờ trả phòng "12:00"
+  basePrice            Int // giá tham khảo (mức thấp nhất)
+  depositRate          Int? // % cọc riêng; null = cấu hình UC-23 (BR-113)
+  cancellationPolicyId Int?
+  cancellationPolicy   CancellationPolicy? @relation(fields: [cancellationPolicyId], references: [id])
+  avgRating            Float          @default(0)
+  reviewCount          Int            @default(0)
+  contactPhone         String? // [Mở rộng]
+  contactEmail         String? // [Mở rộng]
+  status               PropertyStatus @default(DRAFT) // BR-73
+  thumbnail            String?
+  isFeatured           Boolean        @default(false)
+  metaTitle            String? // BF-36
+  metaDescription      String? // BF-36
+  createdById          Int?
+  createdBy            Admin?         @relation(fields: [createdById], references: [id])
+  createdAt            DateTime       @default(now())
+  updatedAt            DateTime       @updatedAt
+
+  roomTypes RoomType[]
+  images    PropertyImage[]
+  amenities PropertyAmenity[]
+  policies  PropertyPolicy[]
+  reviews   Review[]
+  favorites Favorite[]
+  bookings  Booking[]
+  discountCodes DiscountCode[]
+
+  @@index([status])
+  @@index([provinceId])
+  @@index([areaId])
+  @@index([isFeatured])
+}
+
+// Loại phòng (một chỗ nghỉ có nhiều loại phòng).
+model RoomType {
+  id                Int      @id @default(autoincrement())
+  propertyId        Int
+  property          Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  name              String // Standard, Deluxe, Suite...
+  roomSize          Int? // [Mở rộng] diện tích m²
+  bedType           String? // cấu hình giường
+  maxOccupancy      Int      @default(2)
+  totalRooms        Int      @default(1) // số phòng cùng loại (nền tồn kho)
+  breakfastIncluded Boolean  @default(false)
+  smokingAllowed    Boolean  @default(false) // [Mở rộng]
+  basePricePerNight Int
+  description       String?  @db.Text // [Mở rộng]
+
+  inventory RoomInventory[]
+  images    RoomImage[]
+  bookings  Booking[]
+
+  @@index([propertyId])
+}
+
+// Lịch tồn phòng theo ngày cho từng loại phòng (BR-74/24 chống trùng).
+model RoomInventory {
+  id            Int      @id @default(autoincrement())
+  roomTypeId    Int
+  roomType      RoomType @relation(fields: [roomTypeId], references: [id], onDelete: Cascade)
+  date          DateTime @db.Date
+  totalRooms    Int // số phòng mở bán ngày đó
+  bookedRooms   Int      @default(0)
+  heldRooms     Int      @default(0) // UC-09 giữ chỗ tạm
+  priceOverride Int? // BR-26 giá riêng ngày đó
+  isBlocked     Boolean  @default(false) // UC-16 chặn ngày (bảo trì)
+
+  @@unique([roomTypeId, date])
+  @@index([roomTypeId])
+}
+
+// Tiện nghi (nhiều-nhiều với Property).
+model Amenity {
+  id         Int               @id @default(autoincrement())
+  name       String            @unique
+  icon       String?
+  scope      AmenityScope      @default(GENERAL)
+  properties PropertyAmenity[]
+}
+
+model PropertyAmenity {
+  propertyId Int
+  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  amenityId  Int
+  amenity    Amenity  @relation(fields: [amenityId], references: [id], onDelete: Cascade)
+
+  @@id([propertyId, amenityId])
+  @@index([amenityId])
+}
+
+model PropertyImage {
+  id         Int      @id @default(autoincrement())
+  propertyId Int
+  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  url        String
+  caption    String?
+  isCover    Boolean  @default(false)
+  sortOrder  Int      @default(0)
+
+  @@index([propertyId])
+}
+
+model RoomImage {
+  id         Int      @id @default(autoincrement())
+  roomTypeId Int
+  roomType   RoomType @relation(fields: [roomTypeId], references: [id], onDelete: Cascade)
+  url        String
+  caption    String?
+  isCover    Boolean  @default(false)
+  sortOrder  Int      @default(0)
+
+  @@index([roomTypeId])
+}
+
+// Nội quy & chính sách của chỗ nghỉ (house_rules/note/faq).
+model PropertyPolicy {
+  id         Int                @id @default(autoincrement())
+  propertyId Int
+  property   Property           @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  type       PropertyPolicyType @default(HOUSE_RULE)
+  title      String?
+  content    String             @db.Text
+  sortOrder  Int                @default(0)
+
+  @@index([propertyId])
 }
 
 // Khu vực du lịch phổ biến hiển thị ở trang chủ.

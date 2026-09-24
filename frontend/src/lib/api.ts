@@ -103,14 +103,143 @@ export interface DetailResponse {
   similar: Product[]
 }
 
+// ===== Property (chỗ nghỉ — bảng riêng, 3 tầng) =====
+export interface PropertyRoomType {
+  id: number
+  name: string
+  roomSize: number | null
+  bedType: string | null
+  maxOccupancy: number
+  totalRooms: number
+  breakfastIncluded: boolean
+  smokingAllowed: boolean
+  basePricePerNight: number
+  description: string | null
+  images: { id: number; url: string; caption: string | null; isCover: boolean }[]
+}
+export interface PropertyDetail {
+  id: number
+  propertyCode: string
+  name: string
+  slug: string
+  propertyType: string
+  starRating: number | null
+  shortDescription: string | null
+  description: string | null
+  address: string | null
+  latitude: number | null
+  longitude: number | null
+  checkInTime: string | null
+  checkOutTime: string | null
+  basePrice: number
+  depositRate: number | null
+  avgRating: number
+  reviewCount: number
+  contactPhone: string | null
+  contactEmail: string | null
+  thumbnail: string | null
+  province: { id: number; name: string } | null
+  area: { id: number; name: string } | null
+  cancellationPolicy: { id: number; name: string; isRefundable: boolean; freeHours: number; milestones: PolicyMilestone[] } | null
+  images: { id: number; url: string; caption: string | null; isCover: boolean }[]
+  amenities: { id: number; name: string; icon: string | null }[]
+  policies: { id: number; type: string; title: string | null; content: string }[]
+  roomTypes: PropertyRoomType[]
+}
+export interface PropertyDetailResponse {
+  property: PropertyDetail
+  reviews: Review[]
+  similar: Product[]
+}
+
 export interface Availability {
   type: ProductType
   available: boolean
   nights?: number
   roomsLeft?: number
   seatsLeft?: number
+  slotsLeft?: number
   tentativePrice: number | null
   message: string | null
+}
+
+// ===== Tour (bảng riêng) =====
+export interface TourPrice {
+  paxType: 'ADULT' | 'CHILD' | 'INFANT'
+  price: number
+  description: string | null
+  requiresProof: boolean
+}
+export interface TourDeparturePublic {
+  id: number
+  departureDate: string
+  returnDate: string | null
+  totalSlots: number
+  slotsLeft: number
+  status: string
+  guideName: string | null
+  prices: TourPrice[]
+}
+export interface TourItineraryItem {
+  id: number
+  dayNumber: number
+  title: string | null
+  description: string | null
+  meals: string | null
+  accommodation: string | null
+}
+export interface TourInclusionItem {
+  id: number
+  type: 'INCLUDED' | 'EXCLUDED'
+  itemText: string
+}
+export interface TourNoteItem {
+  id: number
+  type: 'TERM' | 'FAQ' | 'REDEMPTION'
+  title: string | null
+  content: string
+}
+export interface PolicyMilestone {
+  daysBefore: number
+  refundRate: number
+}
+export interface TourDetail {
+  id: number
+  tourCode: string
+  title: string
+  slug: string
+  shortDescription: string | null
+  description: string | null
+  highlights: string | null
+  durationDays: number
+  durationNights: number
+  departurePoint: string | null
+  destination: string | null
+  meetingPoint: string | null
+  minPax: number
+  maxPax: number
+  guideLanguage: string | null
+  basePrice: number
+  depositRate: number | null
+  avgRating: number
+  reviewCount: number
+  thumbnail: string | null
+  metaTitle: string | null
+  metaDescription: string | null
+  region: { id: number; name: string } | null
+  theme: { id: number; name: string } | null
+  cancellationPolicy: { id: number; name: string; isRefundable: boolean; freeHours: number; milestones: PolicyMilestone[] } | null
+  images: { id: number; url: string; caption: string | null; isCover: boolean }[]
+  itinerary: TourItineraryItem[]
+  included: TourInclusionItem[]
+  excluded: TourInclusionItem[]
+  notes: TourNoteItem[]
+  departures: TourDeparturePublic[]
+}
+export interface TourDetailResponse {
+  tour: TourDetail
+  reviews: Review[]
+  similar: Product[]
 }
 
 export class ApiError extends Error {
@@ -191,9 +320,15 @@ export const api = {
     return get<ProductList>(`/api/catalog/products?${qs.toString()}`)
   },
   search: (params: URLSearchParams) => get<SearchResult>(`/api/catalog/search?${params.toString()}`),
+  getPropertyDetail: (slug: string) => get<PropertyDetailResponse>(`/api/catalog/products/${encodeURIComponent(slug)}`),
   getProductDetail: (slug: string) => get<DetailResponse>(`/api/catalog/products/${encodeURIComponent(slug)}`),
   checkAvailability: (slug: string, params: URLSearchParams) =>
     get<Availability>(`/api/catalog/products/${encodeURIComponent(slug)}/availability?${params.toString()}`),
+  // Tour (bảng riêng)
+  getTours: (params: URLSearchParams) => get<{ count: number; items: Product[] }>(`/api/catalog/tours?${params.toString()}`),
+  getTourDetail: (slug: string) => get<TourDetailResponse>(`/api/catalog/tours/${encodeURIComponent(slug)}`),
+  checkTourAvailability: (slug: string, params: URLSearchParams) =>
+    get<Availability>(`/api/catalog/tours/${encodeURIComponent(slug)}/availability?${params.toString()}`),
   getInfoList: () => get<{ articles: InfoSummary[] }>('/api/info'),
   getInfoArticle: (slug: string) => get<{ article: InfoArticle }>(`/api/info/${encodeURIComponent(slug)}`),
   register: (body: {
@@ -203,9 +338,9 @@ export const api = {
     name?: string
     acceptedTerms: boolean
   }) => post<RegisterResult>('/api/auth/register', body),
-  verifyEmail: (token: string) => post<{ message: string; email: string }>('/api/auth/verify-email', { token }),
+  verifyEmail: (email: string, code: string) => post<{ message: string; email: string }>('/api/auth/verify-email', { email, code }),
   resendVerification: (email: string) =>
-    post<{ message: string; devVerifyUrl?: string }>('/api/auth/resend-verification', { email }),
+    post<{ message: string }>('/api/auth/resend-verification', { email }),
   login: (email: string, password: string) => post<AuthResult>('/api/auth/login', { email, password }),
   googleAuth: (credential: string) => post<AuthResult & { isNew: boolean }>('/api/auth/google', { credential }),
   getAuthConfig: () => get<{ googleEnabled: boolean }>('/api/auth/config'),
@@ -230,6 +365,7 @@ export const api = {
     checkIn: string
     checkOut: string
     guests: number
+    roomTypeId?: number
     guestName: string
     guestEmail: string
     guestPhone: string
@@ -371,7 +507,6 @@ export interface RegisterResult {
   message: string
   emailSent: boolean
   email: string
-  devVerifyUrl?: string
 }
 
 export function formatPrice(v: number): string {

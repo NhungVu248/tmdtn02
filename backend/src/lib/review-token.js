@@ -14,7 +14,10 @@ export async function createAndSendReviewInvite(booking) {
   const existing = await prisma.reviewToken.findUnique({ where: { bookingId: booking.id } })
   if (existing) return null
 
-  const product = await prisma.product.findUnique({ where: { id: booking.productId }, select: { name: true } })
+  // Đơn homestay -> Property; đơn tour -> Tour (bảng riêng).
+  const productName = booking.tourId
+    ? (await prisma.tour.findUnique({ where: { id: booking.tourId }, select: { title: true } }))?.title
+    : (await prisma.property.findUnique({ where: { id: booking.propertyId }, select: { name: true } }))?.name
   const rawToken = crypto.randomBytes(32).toString('hex')
   await prisma.reviewToken.create({
     data: {
@@ -28,7 +31,7 @@ export async function createAndSendReviewInvite(booking) {
   const reviewUrl = `${clientUrl}/review?token=${rawToken}`
   await sendReviewInviteEmail(booking.guestEmail, {
     code: booking.code,
-    productName: product?.name ?? '',
+    productName: productName ?? '',
     reviewUrl,
   })
   return reviewUrl

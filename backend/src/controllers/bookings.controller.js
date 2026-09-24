@@ -47,9 +47,9 @@ function publicBooking(b, productName, productSlug) {
 
 // UC-12 (extend UC-09/10) – Xác thực lại mã giảm giá ở server (không tin client),
 // trả về { discountCode, discountAmount } để áp vào tổng tiền/cọc.
-async function resolveDiscount({ discountCode, type, productId, subtotal, userId }) {
+async function resolveDiscount({ discountCode, type, productId, propertyId, tourId, subtotal, userId }) {
   if (!discountCode) return { discountCode: null, discountAmount: 0 }
-  const result = await validateDiscount({ code: discountCode, type, productId, subtotal, userId })
+  const result = await validateDiscount({ code: discountCode, type, productId, propertyId, tourId, subtotal, userId })
   if (!result.ok) {
     const err = new Error(result.message)
     err.status = 400
@@ -62,7 +62,7 @@ async function resolveDiscount({ discountCode, type, productId, subtotal, userId
 // UC-09 – Đặt homestay: giữ chỗ tạm + tạo đơn "chờ cọc". Hỗ trợ guest checkout.
 export async function createHomestayBooking(req, res, next) {
   try {
-    const { slug, checkIn, checkOut, guests, guestName, guestEmail, guestPhone, acceptedTerms, discountCode } = req.body
+    const { slug, checkIn, checkOut, guests, roomTypeId, guestName, guestEmail, guestPhone, acceptedTerms, discountCode } = req.body
 
     // BR-28 / 5a: bắt buộc đồng ý điều khoản.
     if (!acceptedTerms) {
@@ -83,52 +83,55 @@ export async function createHomestayBooking(req, res, next) {
       return res.status(400).json({ message: 'Khoảng ngày không hợp lệ' })
     }
 
-    const product = await prisma.product.findUnique({ where: { slug } })
-    if (!product || product.status !== 'VISIBLE' || product.type !== 'HOMESTAY') {
-      return res.status(404).json({ message: 'Homestay không còn khả dụng' }) // 1a
+    const property = await prisma.property.findUnique({ where: { slug }, include: { roomTypes: true } })
+    if (!property || property.status !== 'VISIBLE') {
+      return res.status(404).json({ message: 'Chỗ nghỉ không còn khả dụng' }) // 1a
     }
+    const roomType = roomTypeId ? property.roomTypes.find((r) => r.id === Number(roomTypeId)) : property.roomTypes[0]
+    if (!roomType) return res.status(404).json({ message: 'Không tìm thấy loại phòng' })
 
     // BR-25: giải phóng chỗ giữ tạm đã quá hạn trước khi kiểm tra.
-    await releaseExpiredHomestayHolds(product.id)
+    await releaseExpiredHomestayHolds(property.id)
 
-    // BR-24 / 1a: kiểm tra còn trống theo thời gian thực cho từng đêm.
-    const rows = await prisma.homestayAvailability.findMany({
-      where: { productId: product.id, date: { gte: nights[0], lte: nights[nights.length - 1] } },
+    // BR-24 / 1a: kiểm tra còn trống theo thời gian thực cho từng đêm (theo loại phòng).
+    const rows = await prisma.roomInventory.findMany({
+      where: { roomTypeId: roomType.id, date: { gte: nights[0], lte: nights[nights.length - 1] } },
     })
     const byTime = new Map(rows.map((r) => [new Date(r.date).getTime(), r]))
     for (const d of nights) {
       const row = byTime.get(d.getTime())
-      if (!row || row.totalRooms - row.bookedRooms < 1) {
+      if (!row || row.isBlocked || row.totalRooms - row.bookedRooms - row.heldRooms < 1) {
         return res.status(409).json({ message: 'Không còn phòng trống trong khoảng ngày đã chọn', code: 'SOLD_OUT' })
       }
     }
 
-    // Tính tiền (BR-26/BR-77): dùng giá riêng theo ngày (mùa/cuối tuần) do UC-16 thiết lập nếu có.
+    // Tính tiền (BR-26): dùng giá riêng theo ngày do UC-16 thiết lập nếu có, ngược lại giá loại phòng.
     const totalPrice = nights.reduce((sum, d) => {
       const row = byTime.get(d.getTime())
-      return sum + (row?.priceOverride ?? product.price)
+      return sum + (row?.priceOverride ?? roomType.basePricePerNight)
     }, 0)
     const userId = req.user?.sub ?? null
 
     // UC-12/BR-46: xác thực lại mã giảm giá, cọc tính trên tổng SAU giảm.
     let discount
     try {
-      discount = await resolveDiscount({ discountCode, type: 'HOMESTAY', productId: product.id, subtotal: totalPrice, userId })
+      discount = await resolveDiscount({ discountCode, type: 'HOMESTAY', propertyId: property.id, subtotal: totalPrice, userId })
     } catch (err) {
       return res.status(err.status || 400).json({ message: err.message, code: err.code })
     }
     const payableTotal = totalPrice - discount.discountAmount
-    const depositAmount = Math.round(payableTotal * (await getDepositRate()))
+    const depositRate = property.depositRate != null ? property.depositRate / 100 : await getDepositRate() // BR-113
+    const depositAmount = Math.round(payableTotal * depositRate)
     const remainingAmount = payableTotal - depositAmount
 
     // Mã đơn + PIN (BR-29: PIN chỉ cho guest).
     const code = generateOrderCode()
     const pin = userId ? null : generatePin()
 
-    // Giữ chỗ (tăng bookedRooms cho từng đêm) + tạo đơn trong một transaction.
+    // Giữ chỗ (tăng bookedRooms cho từng đêm của loại phòng) + tạo đơn trong một transaction.
     const [, created] = await prisma.$transaction([
-      prisma.homestayAvailability.updateMany({
-        where: { productId: product.id, date: { in: nights } },
+      prisma.roomInventory.updateMany({
+        where: { roomTypeId: roomType.id, date: { in: nights } },
         data: { bookedRooms: { increment: 1 } },
       }),
       prisma.booking.create({
@@ -137,7 +140,8 @@ export async function createHomestayBooking(req, res, next) {
           pinHash: pin ? hashPin(pin) : null,
           type: 'HOMESTAY',
           status: 'PENDING_DEPOSIT',
-          productId: product.id,
+          propertyId: property.id,
+          roomTypeId: roomType.id,
           userId,
           guestName,
           guestEmail,
@@ -160,13 +164,13 @@ export async function createHomestayBooking(req, res, next) {
     sendBookingEmail(guestEmail, {
       code,
       pin,
-      productName: product.name,
+      productName: property.name,
       totalPrice: payableTotal,
       depositAmount,
       remainingAmount,
     }).catch((e) => console.error('Gửi email đặt chỗ thất bại:', e))
 
-    res.status(201).json({ booking: publicBooking(created, product.name, product.slug), pin })
+    res.status(201).json({ booking: publicBooking(created, property.name, property.slug), pin })
   } catch (err) {
     next(err)
   }
@@ -199,26 +203,27 @@ export async function createTourBooking(req, res, next) {
       return res.status(400).json({ message: 'Ngày khởi hành không hợp lệ' })
     }
 
-    const product = await prisma.product.findUnique({ where: { slug } })
-    if (!product || product.status !== 'VISIBLE' || product.type !== 'TOUR') {
+    const tour = await prisma.tour.findUnique({ where: { slug } })
+    if (!tour || tour.status !== 'VISIBLE') {
       return res.status(404).json({ message: 'Tour không còn khả dụng' })
     }
 
-    await releaseExpiredTourHolds(product.id) // BR-32
+    await releaseExpiredTourHolds(tour.id) // BR-32
 
     // BR-30: chỉ đặt theo chuyến khởi hành đã mở.
     const nextDay = new Date(day.getTime() + 86400000)
     const departure = await prisma.tourDeparture.findFirst({
-      where: { productId: product.id, date: { gte: day, lt: nextDay } },
+      where: { tourId: tour.id, departureDate: { gte: day, lt: nextDay } },
+      include: { prices: true },
     })
-    // BR-79: chuyến đã đóng cũng coi như không có chuyến khởi hành ngày đó.
-    if (!departure || departure.closed) {
+    // BR-79: chuyến đã đóng/hủy coi như không có chuyến khởi hành ngày đó.
+    if (!departure || departure.status === 'CLOSED' || departure.status === 'CANCELLED') {
       return res.status(404).json({ message: 'Không có chuyến khởi hành vào ngày đã chọn' })
     }
 
-    // BR-31 / 1a: kiểm tra đủ chỗ.
+    // BR-31 / 1a: kiểm tra đủ chỗ (trừ cả chỗ đang giữ tạm).
     const totalGuests = adults + numChildren
-    const seatsLeft = departure.totalSeats - departure.bookedSeats
+    const seatsLeft = departure.totalSlots - departure.bookedSlots - departure.heldSlots
     if (seatsLeft < totalGuests) {
       return res.status(409).json({
         message: 'Không đủ chỗ cho chuyến này. Vui lòng giảm số khách hoặc chọn ngày khác.',
@@ -227,21 +232,21 @@ export async function createTourBooking(req, res, next) {
       })
     }
 
-    // BR-33/BR-83: tổng tiền theo loại khách, ưu tiên giá riêng theo chuyến (UC-17) trước giá cơ bản.
-    const adultPrice = departure.priceAdultOverride ?? product.price
-    const priceChild = departure.priceChildOverride ?? product.priceChild ?? product.price
-    const totalPrice = adultPrice * adults + priceChild * numChildren
+    // BR-33/BR-83: tổng tiền theo loại khách, dùng bảng giá theo chuyến (TourPrice); fallback basePrice.
+    const priceOf = (t) => departure.prices.find((p) => p.paxType === t)?.price ?? tour.basePrice
+    const totalPrice = priceOf('ADULT') * adults + priceOf('CHILD') * numChildren
     const userId = req.user?.sub ?? null
 
     // UC-12/BR-46: xác thực lại mã giảm giá, cọc tính trên tổng SAU giảm.
     let discount
     try {
-      discount = await resolveDiscount({ discountCode, type: 'TOUR', productId: product.id, subtotal: totalPrice, userId })
+      discount = await resolveDiscount({ discountCode, type: 'TOUR', tourId: tour.id, subtotal: totalPrice, userId })
     } catch (err) {
       return res.status(err.status || 400).json({ message: err.message, code: err.code })
     }
     const payableTotal = totalPrice - discount.discountAmount
-    const depositAmount = Math.round(payableTotal * (await getDepositRate()))
+    const depositRate = tour.depositRate != null ? tour.depositRate / 100 : await getDepositRate() // BR-113
+    const depositAmount = Math.round(payableTotal * depositRate)
     const remainingAmount = payableTotal - depositAmount
 
     const code = generateOrderCode()
@@ -250,7 +255,7 @@ export async function createTourBooking(req, res, next) {
     const [, created] = await prisma.$transaction([
       prisma.tourDeparture.update({
         where: { id: departure.id },
-        data: { bookedSeats: { increment: totalGuests } },
+        data: { bookedSlots: { increment: totalGuests } },
       }),
       prisma.booking.create({
         data: {
@@ -258,7 +263,8 @@ export async function createTourBooking(req, res, next) {
           pinHash: pin ? hashPin(pin) : null,
           type: 'TOUR',
           status: 'PENDING_DEPOSIT',
-          productId: product.id,
+          tourId: tour.id,
+          tourDepartureId: departure.id,
           userId,
           guestName,
           guestEmail,
@@ -280,13 +286,13 @@ export async function createTourBooking(req, res, next) {
     sendBookingEmail(guestEmail, {
       code,
       pin,
-      productName: product.name,
+      productName: tour.title,
       totalPrice: payableTotal,
       depositAmount,
       remainingAmount,
     }).catch((e) => console.error('Gửi email đặt tour thất bại:', e))
 
-    res.status(201).json({ booking: publicBooking(created, product.name, product.slug), pin })
+    res.status(201).json({ booking: publicBooking(created, tour.title, tour.slug), pin })
   } catch (err) {
     next(err)
   }

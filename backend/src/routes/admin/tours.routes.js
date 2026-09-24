@@ -8,6 +8,7 @@ import {
   listTours,
   removeImage,
   setTourVisibility,
+  tourCategories,
   updateDeparture,
   updateTour,
 } from '../../controllers/admin/tours.controller.js'
@@ -22,6 +23,8 @@ router.use(requireAdmin)
 
 // Upload ảnh (BR-82) — đặt trước các route /:id để tránh nhầm "uploads" thành id.
 router.post('/uploads/image', uploadImage.single('file'), uploadFile)
+// Danh mục region/theme/duration + chính sách hủy cho form tour.
+router.get('/categories', tourCategories)
 
 router.get('/', listTours)
 router.post('/', createTour)

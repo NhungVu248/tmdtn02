@@ -299,8 +299,9 @@ Khởi động lại backend, sẽ báo `• VNPAY: BẬT`. Trang thanh toán s�
 | POST | `/api/admin/homestays/uploads/image` | UC-16: tải ảnh lên (multipart, JPEG/PNG/WEBP ≤5MB) | Bearer (admin) |
 | POST/DELETE | `/api/admin/homestays/:id/images(/:imageId)` | UC-16: gắn/gỡ ảnh khỏi homestay | Bearer (admin) |
 | GET/PUT | `/api/admin/homestays/:id/availability` | UC-16: xem/thiết lập lịch tồn phòng theo khoảng ngày (mở/chặn + giá riêng) | Bearer (admin) |
-| GET | `/api/admin/tours` | UC-17: danh sách tour (mọi trạng thái, lọc `?status=&search=`) | Bearer (admin) |
-| POST | `/api/admin/tours` | UC-17: tạo tour mới (mặc định ẩn) | Bearer (admin) |
+| GET | `/api/admin/tours` | UC-17: danh sách tour (bảng Tour riêng, lọc `?status=DRAFT\|VISIBLE\|HIDDEN&search=`) | Bearer (admin) |
+| GET | `/api/admin/tours/categories` | UC-17: danh mục vùng/chủ đề + chính sách hủy cho form tour | Bearer (admin) |
+| POST | `/api/admin/tours` | UC-17: tạo tour mới (mặc định DRAFT; kèm lịch trình/bao gồm/ghi chú) | Bearer (admin) |
 | GET/PUT | `/api/admin/tours/:id` | UC-17: xem/cập nhật chi tiết tour | Bearer (admin) |
 | PATCH | `/api/admin/tours/:id/visibility` | UC-17: hiển thị/gỡ hiển thị (`{status}`) | Bearer (admin) |
 | POST | `/api/admin/tours/uploads/image` | UC-17: tải ảnh lên (multipart, JPEG/PNG/WEBP ≤5MB) | Bearer (admin) |
@@ -334,8 +335,13 @@ Khởi động lại backend, sẽ báo `• VNPAY: BẬT`. Trang thanh toán s�
 | GET | `/api/catalog/categories` | UC-01: cây danh mục (`?type=HOMESTAY\|TOUR`) | Không |
 | GET | `/api/catalog/products` | UC-01/02: danh sách sản phẩm | Không |
 | GET | `/api/catalog/search` | UC-02: tìm kiếm & lọc | Không |
-| GET | `/api/catalog/products/:slug` | UC-03: chi tiết + đánh giá + gợi ý | Không |
-| GET | `/api/catalog/products/:slug/availability` | UC-03: tình trạng còn trống + giá tạm tính | Không |
+| GET | `/api/catalog/products/:slug` | UC-03: chi tiết homestay + đánh giá + gợi ý | Không |
+| GET | `/api/catalog/products/:slug/availability` | UC-03: tình trạng còn trống homestay + giá tạm tính | Không |
+| GET | `/api/catalog/tours` | Danh sách tour (lọc `?regionId=&themeId=&duration=&search=&sort=`) | Không |
+| GET | `/api/catalog/tours/:slug` | UC-03: chi tiết tour (lịch trình, bao gồm, chuyến + giá theo loại khách, chính sách hủy) | Không |
+| GET | `/api/catalog/tours/:slug/availability` | UC-03: còn chỗ + giá tạm tính theo chuyến (`?departureId=&adults=&children=`) | Không |
+| GET | `/api/catalog/products/:slug` | UC-03: chi tiết chỗ nghỉ (Property): loại phòng, tiện nghi, nội quy, chính sách hủy | Không |
+| GET | `/api/catalog/products/:slug/availability` | UC-03: còn phòng + giá theo loại phòng (`?from=&to=&roomTypeId=`) | Không |
 | GET | `/api/info` | UC-04: danh sách bài viết thông tin/chính sách | Không |
 | GET | `/api/info/:slug` | UC-04: nội dung một bài viết | Không |
 

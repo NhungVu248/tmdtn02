@@ -4,7 +4,6 @@ import { publicUploadUrl } from '../../lib/uploads.js'
 import { parseUtcDate } from '../../lib/booking.js'
 
 const ACTIVE_STATUSES = ['PENDING_DEPOSIT', 'DEPOSITED', 'CONFIRMED']
-const REQUIRED_FIELDS = ['name', 'location', 'price']
 
 function slugify(s) {
   return String(s)
@@ -16,28 +15,33 @@ function slugify(s) {
     .replace(/(^-|-$)/g, '')
 }
 
+const num = (v, def = null) => (v != null && v !== '' ? Number(v) : def)
+const str = (v) => (v != null && String(v).trim() !== '' ? String(v).trim() : null)
+
 // UC-17 – Danh sách tour (mọi trạng thái) cho khu vực quản trị.
 export async function listTours(req, res, next) {
   try {
     const { status, search } = req.query
-    const where = { type: 'TOUR' }
-    if (status === 'VISIBLE' || status === 'HIDDEN') where.status = status
-    if (search) where.name = { contains: String(search) }
+    const where = {}
+    if (['DRAFT', 'VISIBLE', 'HIDDEN'].includes(status)) where.status = status
+    if (search) where.title = { contains: String(search) }
 
-    const items = await prisma.product.findMany({
+    const items = await prisma.tour.findMany({
       where,
       select: {
         id: true,
-        name: true,
+        title: true,
         slug: true,
+        tourCode: true,
         status: true,
-        location: true,
-        price: true,
-        priceChild: true,
+        destination: true,
+        departurePoint: true,
+        basePrice: true,
         durationDays: true,
+        durationNights: true,
         thumbnail: true,
-        categoryId: true,
-        category: { select: { name: true } },
+        region: { select: { name: true } },
+        theme: { select: { name: true } },
         updatedAt: true,
       },
       orderBy: { updatedAt: 'desc' },
@@ -48,97 +52,143 @@ export async function listTours(req, res, next) {
   }
 }
 
+// UC-17 – Chi tiết tour (đầy đủ để chỉnh sửa).
 export async function getTour(req, res, next) {
   try {
     const id = Number(req.params.id)
-    const product = await prisma.product.findUnique({
+    const tour = await prisma.tour.findUnique({
       where: { id },
       include: {
-        images: { orderBy: { order: 'asc' } },
-        category: true,
-        departures: { orderBy: { date: 'asc' } },
+        images: { orderBy: { sortOrder: 'asc' } },
+        region: true,
+        theme: true,
+        cancellationPolicy: true,
+        itinerary: { orderBy: { dayNumber: 'asc' } },
+        inclusions: { orderBy: { sortOrder: 'asc' } },
+        notes: { orderBy: { sortOrder: 'asc' } },
+        departures: { orderBy: { departureDate: 'asc' }, include: { prices: true } },
       },
     })
-    if (!product || product.type !== 'TOUR') {
-      return res.status(404).json({ message: 'Không tìm thấy tour' })
-    }
-    res.json({ product })
+    if (!tour) return res.status(404).json({ message: 'Không tìm thấy tour' })
+    res.json({ tour })
   } catch (err) {
     next(err)
   }
 }
 
 function validatePayload(body) {
-  for (const f of REQUIRED_FIELDS) {
-    if (body[f] === undefined || body[f] === null || String(body[f]).trim() === '') {
-      return `Thiếu trường bắt buộc: ${f}` // 5a
-    }
+  if (!str(body.title)) return 'Thiếu tên tour' // 5a
+  if (body.basePrice == null || Number.isNaN(Number(body.basePrice)) || Number(body.basePrice) < 0) {
+    return 'Giá tham khảo không hợp lệ'
   }
-  if (Number.isNaN(Number(body.price)) || Number(body.price) < 0) {
-    return 'Giá người lớn không hợp lệ'
-  }
-  if (body.priceChild != null && (Number.isNaN(Number(body.priceChild)) || Number(body.priceChild) < 0)) {
-    return 'Giá trẻ em không hợp lệ'
-  }
-  if (body.durationDays != null && (!Number.isInteger(Number(body.durationDays)) || Number(body.durationDays) < 1)) {
+  if (body.durationDays != null && body.durationDays !== '' && (!Number.isInteger(Number(body.durationDays)) || Number(body.durationDays) < 1)) {
     return 'Thời lượng (số ngày) không hợp lệ'
+  }
+  if (body.depositRate != null && body.depositRate !== '' && (Number(body.depositRate) < 1 || Number(body.depositRate) > 100)) {
+    return 'Tỷ lệ cọc phải từ 1 đến 100'
   }
   return null
 }
 
-// UC-17 – Tạo tour mới.
+function scalarData(body) {
+  return {
+    title: str(body.title),
+    shortDescription: str(body.shortDescription),
+    description: str(body.description),
+    highlights: str(body.highlights),
+    regionId: num(body.regionId),
+    themeId: num(body.themeId),
+    durationDays: num(body.durationDays, 1),
+    durationNights: num(body.durationNights, Math.max(0, (num(body.durationDays, 1) || 1) - 1)),
+    departurePoint: str(body.departurePoint),
+    destination: str(body.destination),
+    meetingPoint: str(body.meetingPoint),
+    minPax: num(body.minPax, 1),
+    maxPax: num(body.maxPax, 30),
+    guideLanguage: str(body.guideLanguage),
+    basePrice: Number(body.basePrice),
+    depositRate: num(body.depositRate),
+    cancellationPolicyId: num(body.cancellationPolicyId),
+    metaTitle: str(body.metaTitle) || str(body.title),
+    metaDescription: str(body.metaDescription) || str(body.shortDescription),
+  }
+}
+
+// Thay toàn bộ lịch trình / bao gồm / ghi chú (nếu payload có gửi).
+async function replaceSubEntities(tx, tourId, body) {
+  if (Array.isArray(body.itinerary)) {
+    await tx.tourItinerary.deleteMany({ where: { tourId } })
+    for (let i = 0; i < body.itinerary.length; i++) {
+      const it = body.itinerary[i]
+      await tx.tourItinerary.create({
+        data: {
+          tourId,
+          dayNumber: it.dayNumber ?? i + 1,
+          title: str(it.title),
+          description: str(it.description),
+          meals: str(it.meals),
+          accommodation: str(it.accommodation),
+        },
+      })
+    }
+  }
+  if (Array.isArray(body.included) || Array.isArray(body.excluded)) {
+    await tx.tourInclusion.deleteMany({ where: { tourId } })
+    const mk = async (arr, type) => {
+      for (let i = 0; i < (arr || []).length; i++) {
+        const text = str(typeof arr[i] === 'string' ? arr[i] : arr[i]?.itemText)
+        if (text) await tx.tourInclusion.create({ data: { tourId, type, itemText: text, sortOrder: i } })
+      }
+    }
+    await mk(body.included, 'INCLUDED')
+    await mk(body.excluded, 'EXCLUDED')
+  }
+  if (Array.isArray(body.notes)) {
+    await tx.tourNote.deleteMany({ where: { tourId } })
+    for (let i = 0; i < body.notes.length; i++) {
+      const n = body.notes[i]
+      if (str(n.content)) {
+        await tx.tourNote.create({
+          data: { tourId, type: ['TERM', 'FAQ', 'REDEMPTION'].includes(n.type) ? n.type : 'TERM', title: str(n.title), content: str(n.content), sortOrder: i },
+        })
+      }
+    }
+  }
+}
+
+// UC-17 – Tạo tour mới (mặc định DRAFT/ẩn — BR-79).
 export async function createTour(req, res, next) {
   try {
     const issue = validatePayload(req.body)
     if (issue) return res.status(400).json({ message: issue })
 
-    const {
-      name,
-      description,
-      location,
-      price,
-      priceChild,
-      durationDays,
-      categoryId,
-      itinerary,
-      included,
-      excluded,
-      cancellationPolicy,
-      thumbnail,
-    } = req.body
-    let slug = req.body.slug ? slugify(req.body.slug) : slugify(name)
+    let slug = req.body.slug ? slugify(req.body.slug) : slugify(req.body.title)
     if (!slug) return res.status(400).json({ message: 'Không tạo được đường dẫn (slug) hợp lệ từ tên' })
-
-    const dup = await prisma.product.findUnique({ where: { slug } })
+    const dup = await prisma.tour.findUnique({ where: { slug } })
     if (dup) return res.status(409).json({ message: 'Đường dẫn (slug) đã tồn tại, vui lòng đổi tên hoặc slug khác' })
 
-    const product = await prisma.product.create({
-      data: {
-        type: 'TOUR',
-        status: 'HIDDEN', // BR-79: mặc định ẩn, admin bật hiển thị sau khi kiểm tra xong
-        name,
-        slug,
-        description: description || null,
-        location,
-        price: Number(price),
-        priceChild: priceChild != null && priceChild !== '' ? Number(priceChild) : null,
-        durationDays: durationDays != null && durationDays !== '' ? Number(durationDays) : null,
-        categoryId: categoryId != null ? Number(categoryId) : null,
-        itinerary: itinerary || null,
-        included: included || null,
-        excluded: excluded || null,
-        cancellationPolicy: cancellationPolicy || null,
-        thumbnail: thumbnail || null,
-      },
+    const tourCode = str(req.body.tourCode) || 'TOUR-' + Date.now().toString(36).toUpperCase()
+    const dupCode = await prisma.tour.findUnique({ where: { tourCode } })
+    if (dupCode) return res.status(409).json({ message: 'Mã tour đã tồn tại' })
+
+    const tour = await prisma.$transaction(async (tx) => {
+      const created = await tx.tour.create({
+        data: {
+          ...scalarData(req.body),
+          slug,
+          tourCode,
+          status: 'DRAFT',
+          thumbnail: str(req.body.thumbnail),
+          isFeatured: Boolean(req.body.isFeatured),
+          createdById: req.admin.sub,
+        },
+      })
+      await replaceSubEntities(tx, created.id, req.body)
+      return created
     })
 
-    await logAdminAction(req.admin.sub, 'tour.create', {
-      entityType: 'Product',
-      entityId: product.id,
-      detail: { name: product.name, slug: product.slug },
-    })
-
-    res.status(201).json({ product })
+    await logAdminAction(req.admin.sub, 'tour.create', { entityType: 'Tour', entityId: tour.id, detail: { title: tour.title, slug: tour.slug } })
+    res.status(201).json({ tour })
   } catch (err) {
     next(err)
   }
@@ -148,67 +198,58 @@ export async function createTour(req, res, next) {
 export async function updateTour(req, res, next) {
   try {
     const id = Number(req.params.id)
-    const existing = await prisma.product.findUnique({ where: { id } })
-    if (!existing || existing.type !== 'TOUR') {
-      return res.status(404).json({ message: 'Không tìm thấy tour' })
-    }
+    const existing = await prisma.tour.findUnique({ where: { id } })
+    if (!existing) return res.status(404).json({ message: 'Không tìm thấy tour' })
 
-    const merged = { ...existing, ...req.body }
-    const issue = validatePayload(merged)
+    const issue = validatePayload({ ...existing, ...req.body })
     if (issue) return res.status(400).json({ message: issue })
 
-    const data = {
-      name: req.body.name,
-      description: req.body.description ?? null,
-      location: req.body.location,
-      price: Number(req.body.price),
-      priceChild: req.body.priceChild != null && req.body.priceChild !== '' ? Number(req.body.priceChild) : null,
-      durationDays: req.body.durationDays != null && req.body.durationDays !== '' ? Number(req.body.durationDays) : null,
-      categoryId: req.body.categoryId != null ? Number(req.body.categoryId) : null,
-      itinerary: req.body.itinerary ?? null,
-      included: req.body.included ?? null,
-      excluded: req.body.excluded ?? null,
-      cancellationPolicy: req.body.cancellationPolicy ?? null,
+    const data = scalarData({ ...existing, ...req.body })
+    if (req.body.thumbnail !== undefined) data.thumbnail = str(req.body.thumbnail)
+    if (req.body.isFeatured !== undefined) data.isFeatured = Boolean(req.body.isFeatured)
+    if (req.body.tourCode && str(req.body.tourCode) !== existing.tourCode) {
+      const dupCode = await prisma.tour.findFirst({ where: { tourCode: str(req.body.tourCode), id: { not: id } } })
+      if (dupCode) return res.status(409).json({ message: 'Mã tour đã tồn tại' })
+      data.tourCode = str(req.body.tourCode)
     }
-    if (req.body.thumbnail !== undefined) data.thumbnail = req.body.thumbnail
-
     if (req.body.slug) {
       const slug = slugify(req.body.slug)
       if (slug !== existing.slug) {
-        const dup = await prisma.product.findUnique({ where: { slug } })
+        const dup = await prisma.tour.findFirst({ where: { slug, id: { not: id } } })
         if (dup) return res.status(409).json({ message: 'Đường dẫn (slug) đã tồn tại' })
         data.slug = slug
       }
     }
 
-    const product = await prisma.product.update({ where: { id }, data })
-    await logAdminAction(req.admin.sub, 'tour.update', { entityType: 'Product', entityId: id, detail: data })
+    const tour = await prisma.$transaction(async (tx) => {
+      const updated = await tx.tour.update({ where: { id }, data })
+      await replaceSubEntities(tx, id, req.body)
+      return updated
+    })
 
-    res.json({ product })
+    await logAdminAction(req.admin.sub, 'tour.update', { entityType: 'Tour', entityId: id, detail: { title: tour.title } })
+    res.json({ tour })
   } catch (err) {
     next(err)
   }
 }
 
-// UC-17 (2a) – Hiển thị/gỡ hiển thị (không xóa, giữ lịch sử đơn — BR-79).
-// BR-81: nếu gỡ hiển thị mà còn chuyến tương lai có đơn hợp lệ, vẫn cho phép nhưng CẢNH BÁO admin.
+// UC-17 (2a) – Đổi trạng thái hiển thị (DRAFT/VISIBLE/HIDDEN). BR-81: cảnh báo nếu còn đơn tương lai khi ẩn.
 export async function setTourVisibility(req, res, next) {
   try {
     const id = Number(req.params.id)
     const { status } = req.body
-    if (status !== 'VISIBLE' && status !== 'HIDDEN') {
+    if (!['DRAFT', 'VISIBLE', 'HIDDEN'].includes(status)) {
       return res.status(400).json({ message: 'Trạng thái không hợp lệ' })
     }
-    const existing = await prisma.product.findUnique({ where: { id } })
-    if (!existing || existing.type !== 'TOUR') {
-      return res.status(404).json({ message: 'Không tìm thấy tour' })
-    }
+    const existing = await prisma.tour.findUnique({ where: { id } })
+    if (!existing) return res.status(404).json({ message: 'Không tìm thấy tour' })
 
     let warning = null
-    if (status === 'HIDDEN') {
+    if (status !== 'VISIBLE') {
       const today = new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), new Date().getUTCDate()))
       const futureBookings = await prisma.booking.findMany({
-        where: { productId: id, type: 'TOUR', status: { in: ACTIVE_STATUSES }, checkIn: { gte: today } },
+        where: { tourId: id, type: 'TOUR', status: { in: ACTIVE_STATUSES }, checkIn: { gte: today } },
         select: { code: true, checkIn: true },
       })
       if (futureBookings.length) {
@@ -219,35 +260,30 @@ export async function setTourVisibility(req, res, next) {
       }
     }
 
-    const product = await prisma.product.update({ where: { id }, data: { status } })
-    await logAdminAction(req.admin.sub, status === 'HIDDEN' ? 'tour.hide' : 'tour.show', {
-      entityType: 'Product',
-      entityId: id,
-    })
-
-    res.json({ product, warning })
+    const tour = await prisma.tour.update({ where: { id }, data: { status } })
+    await logAdminAction(req.admin.sub, status === 'VISIBLE' ? 'tour.show' : 'tour.hide', { entityType: 'Tour', entityId: id })
+    res.json({ tour, warning })
   } catch (err) {
     next(err)
   }
 }
 
+// ---------- Ảnh (TourImage) ----------
 export async function addImage(req, res, next) {
   try {
     const id = Number(req.params.id)
-    const { filename, order } = req.body
-    const product = await prisma.product.findUnique({ where: { id } })
-    if (!product || product.type !== 'TOUR') {
-      return res.status(404).json({ message: 'Không tìm thấy tour' })
-    }
+    const { filename, caption } = req.body
+    const tour = await prisma.tour.findUnique({ where: { id } })
+    if (!tour) return res.status(404).json({ message: 'Không tìm thấy tour' })
     if (!filename) return res.status(400).json({ message: 'Thiếu tên tệp ảnh' })
 
     const url = publicUploadUrl(filename)
-    const image = await prisma.productImage.create({ data: { productId: id, url, order: order ?? 0 } })
-    if (!product.thumbnail) {
-      await prisma.product.update({ where: { id }, data: { thumbnail: url } })
-    }
-    await logAdminAction(req.admin.sub, 'tour.image.add', { entityType: 'Product', entityId: id, detail: { url } })
-
+    const count = await prisma.tourImage.count({ where: { tourId: id } })
+    const image = await prisma.tourImage.create({
+      data: { tourId: id, url, caption: str(caption), isCover: count === 0, sortOrder: count },
+    })
+    if (!tour.thumbnail) await prisma.tour.update({ where: { id }, data: { thumbnail: url } })
+    await logAdminAction(req.admin.sub, 'tour.image.add', { entityType: 'Tour', entityId: id, detail: { url } })
     res.status(201).json({ image })
   } catch (err) {
     next(err)
@@ -258,107 +294,121 @@ export async function removeImage(req, res, next) {
   try {
     const id = Number(req.params.id)
     const imageId = Number(req.params.imageId)
-    await prisma.productImage.deleteMany({ where: { id: imageId, productId: id } })
-    await logAdminAction(req.admin.sub, 'tour.image.remove', { entityType: 'Product', entityId: id, detail: { imageId } })
+    await prisma.tourImage.deleteMany({ where: { id: imageId, tourId: id } })
+    await logAdminAction(req.admin.sub, 'tour.image.remove', { entityType: 'Tour', entityId: id, detail: { imageId } })
     res.json({ ok: true })
   } catch (err) {
     next(err)
   }
 }
 
-// ---------- Ngày khởi hành (BR-80) ----------
+// ---------- Chuyến khởi hành (TourDeparture + TourPrice) ----------
 
-// UC-17 – Thêm một chuyến khởi hành mới.
+// UC-17 – Thêm chuyến khởi hành mới + giá theo loại khách (BR-80/33).
 export async function createDeparture(req, res, next) {
   try {
     const id = Number(req.params.id)
-    const { date, totalSeats, priceAdultOverride, priceChildOverride } = req.body
-    const product = await prisma.product.findUnique({ where: { id } })
-    if (!product || product.type !== 'TOUR') {
-      return res.status(404).json({ message: 'Không tìm thấy tour' })
-    }
+    const { date, totalSlots, priceAdult, priceChild, priceInfant, guideName } = req.body
+    const tour = await prisma.tour.findUnique({ where: { id } })
+    if (!tour) return res.status(404).json({ message: 'Không tìm thấy tour' })
+
     const day = parseUtcDate(date)
     if (!day) return res.status(400).json({ message: 'Ngày khởi hành không hợp lệ' })
-    const seats = Number(totalSeats)
-    if (!Number.isInteger(seats) || seats <= 0) {
+    const slots = Number(totalSlots)
+    if (!Number.isInteger(slots) || slots <= 0) {
       return res.status(400).json({ message: 'Số chỗ tối đa phải lớn hơn 0' }) // 5a
     }
+    const adult = num(priceAdult, tour.basePrice)
+    if (adult == null || adult < 0) return res.status(400).json({ message: 'Giá người lớn không hợp lệ' })
 
+    const returnDate = new Date(day.getTime() + (tour.durationNights || 0) * 86400000)
     const departure = await prisma.tourDeparture.create({
       data: {
-        productId: id,
-        date: day,
-        totalSeats: seats,
-        priceAdultOverride: priceAdultOverride != null && priceAdultOverride !== '' ? Number(priceAdultOverride) : null,
-        priceChildOverride: priceChildOverride != null && priceChildOverride !== '' ? Number(priceChildOverride) : null,
+        tourId: id,
+        departureDate: day,
+        returnDate,
+        totalSlots: slots,
+        guideName: str(guideName),
+        prices: {
+          create: [
+            { paxType: 'ADULT', price: adult, description: 'Người lớn' },
+            ...(num(priceChild) != null ? [{ paxType: 'CHILD', price: num(priceChild), description: 'Trẻ em' }] : []),
+            ...(num(priceInfant) != null ? [{ paxType: 'INFANT', price: num(priceInfant), description: 'Em bé' }] : []),
+          ],
+        },
       },
+      include: { prices: true },
     })
 
-    await logAdminAction(req.admin.sub, 'departure.create', {
-      entityType: 'TourDeparture',
-      entityId: departure.id,
-      detail: { productId: id, date, totalSeats: seats },
-    })
-
+    await logAdminAction(req.admin.sub, 'departure.create', { entityType: 'TourDeparture', entityId: departure.id, detail: { tourId: id, date, totalSlots: slots } })
     res.status(201).json({ departure })
   } catch (err) {
     next(err)
   }
 }
 
-// UC-17 – Cập nhật số chỗ/giá của một chuyến. BR-81/4a-2: không giảm dưới số đã bán.
+// UC-17 – Cập nhật số chỗ / giá của một chuyến. BR-81/4a-2: không giảm dưới số đã bán.
 export async function updateDeparture(req, res, next) {
   try {
     const id = Number(req.params.id)
     const depId = Number(req.params.depId)
-    const departure = await prisma.tourDeparture.findFirst({ where: { id: depId, productId: id } })
+    const departure = await prisma.tourDeparture.findFirst({ where: { id: depId, tourId: id }, include: { prices: true } })
     if (!departure) return res.status(404).json({ message: 'Không tìm thấy chuyến khởi hành' })
 
     const data = {}
-    if (req.body.totalSeats !== undefined) {
-      const seats = Number(req.body.totalSeats)
-      if (!Number.isInteger(seats) || seats <= 0) {
+    if (req.body.totalSlots !== undefined) {
+      const slots = Number(req.body.totalSlots)
+      if (!Number.isInteger(slots) || slots <= 0) {
         return res.status(400).json({ message: 'Số chỗ tối đa phải lớn hơn 0' }) // 5a
       }
-      if (seats < departure.bookedSeats) {
+      if (slots < departure.bookedSlots) {
         return res.status(409).json({
-          message: `Không thể giảm số chỗ xuống ${seats} vì đã bán ${departure.bookedSeats} chỗ cho chuyến này.`, // 4a-2
-          bookedSeats: departure.bookedSeats,
+          message: `Không thể giảm số chỗ xuống ${slots} vì đã bán ${departure.bookedSlots} chỗ cho chuyến này.`, // 4a-2
+          bookedSlots: departure.bookedSlots,
         })
       }
-      data.totalSeats = seats
+      data.totalSlots = slots
     }
-    if (req.body.priceAdultOverride !== undefined) {
-      data.priceAdultOverride =
-        req.body.priceAdultOverride === '' || req.body.priceAdultOverride == null ? null : Number(req.body.priceAdultOverride)
-    }
-    if (req.body.priceChildOverride !== undefined) {
-      data.priceChildOverride =
-        req.body.priceChildOverride === '' || req.body.priceChildOverride == null ? null : Number(req.body.priceChildOverride)
-    }
+    if (req.body.guideName !== undefined) data.guideName = str(req.body.guideName)
 
-    const updated = await prisma.tourDeparture.update({ where: { id: depId }, data })
+    // Cập nhật/tạo giá theo loại khách nếu gửi.
+    const upsertPrice = async (paxType, value, desc) => {
+      if (value === undefined) return
+      const price = num(value)
+      const existing = departure.prices.find((p) => p.paxType === paxType)
+      if (price == null) {
+        if (existing && paxType !== 'ADULT') await prisma.tourPrice.delete({ where: { id: existing.id } })
+        return
+      }
+      if (existing) await prisma.tourPrice.update({ where: { id: existing.id }, data: { price } })
+      else await prisma.tourPrice.create({ data: { departureId: depId, paxType, price, description: desc } })
+    }
+    await upsertPrice('ADULT', req.body.priceAdult, 'Người lớn')
+    await upsertPrice('CHILD', req.body.priceChild, 'Trẻ em')
+    await upsertPrice('INFANT', req.body.priceInfant, 'Em bé')
+
+    const updated = await prisma.tourDeparture.update({ where: { id: depId }, data, include: { prices: true } })
     await logAdminAction(req.admin.sub, 'departure.update', { entityType: 'TourDeparture', entityId: depId, detail: data })
-
     res.json({ departure: updated })
   } catch (err) {
     next(err)
   }
 }
 
-// UC-17 (4a) – Đóng/hủy một chuyến khởi hành. BR-81/4a-1: chặn nếu còn đơn hợp lệ trên chuyến đó.
+// UC-17 (4a) – Đóng/hủy chuyến. BR-81/4a-1: chặn nếu còn đơn hợp lệ trên chuyến đó.
 export async function closeDeparture(req, res, next) {
   try {
     const id = Number(req.params.id)
     const depId = Number(req.params.depId)
-    const departure = await prisma.tourDeparture.findFirst({ where: { id: depId, productId: id } })
+    const departure = await prisma.tourDeparture.findFirst({ where: { id: depId, tourId: id } })
     if (!departure) return res.status(404).json({ message: 'Không tìm thấy chuyến khởi hành' })
-    if (departure.closed) return res.status(409).json({ message: 'Chuyến này đã được đóng trước đó' })
+    if (departure.status === 'CLOSED' || departure.status === 'CANCELLED') {
+      return res.status(409).json({ message: 'Chuyến này đã được đóng trước đó' })
+    }
 
-    if (departure.bookedSeats > 0) {
-      const nextDay = new Date(departure.date.getTime() + 86400000)
+    if (departure.bookedSlots > 0) {
       const bookings = await prisma.booking.findMany({
-        where: { productId: id, type: 'TOUR', status: { in: ACTIVE_STATUSES }, checkIn: { gte: departure.date, lt: nextDay } },
+        where: { tourDepartureId: depId, type: 'TOUR', status: { in: ACTIVE_STATUSES } },
         select: { code: true, guests: true, children: true, status: true },
       })
       return res.status(409).json({
@@ -367,10 +417,24 @@ export async function closeDeparture(req, res, next) {
       })
     }
 
-    const updated = await prisma.tourDeparture.update({ where: { id: depId }, data: { closed: true } })
+    const updated = await prisma.tourDeparture.update({ where: { id: depId }, data: { status: 'CLOSED' } })
     await logAdminAction(req.admin.sub, 'departure.close', { entityType: 'TourDeparture', entityId: depId })
-
     res.json({ departure: updated })
+  } catch (err) {
+    next(err)
+  }
+}
+
+// Danh mục region/theme cho form tour (BF-02).
+export async function tourCategories(req, res, next) {
+  try {
+    const cats = await prisma.category.findMany({ where: { type: 'TOUR' }, orderBy: [{ order: 'asc' }, { name: 'asc' }] })
+    res.json({
+      regions: cats.filter((c) => c.kind === 'region'),
+      themes: cats.filter((c) => c.kind === 'theme'),
+      durations: cats.filter((c) => c.kind === 'duration'),
+      policies: await prisma.cancellationPolicy.findMany({ orderBy: { id: 'asc' } }),
+    })
   } catch (err) {
     next(err)
   }
