@@ -51,7 +51,7 @@ export function WishlistPage() {
       ) : (
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
           {visible.map((p) => (
-            <ProductCard key={p.id} product={p} />
+            <ProductCard key={`${p.type}-${p.id}`} product={p} />
           ))}
         </div>
       )}

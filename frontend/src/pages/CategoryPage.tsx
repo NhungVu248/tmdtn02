@@ -176,7 +176,7 @@ export function CategoryPage() {
               ) : (
                 <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">
                   {items.map((p) => (
-                    <ProductCard key={p.id} product={p} />
+                    <ProductCard key={`${p.type}-${p.id}`} product={p} />
                   ))}
                 </div>
               )}

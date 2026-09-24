@@ -234,7 +234,7 @@ export function TourDetailPage() {
         <div className="mt-10">
           <h2 className="mb-3 text-lg font-bold text-slate-900">Tour tương tự</h2>
           <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-            {data.similar.map((p) => <ProductCard key={p.id} product={p} />)}
+            {data.similar.map((p) => <ProductCard key={`${p.type}-${p.id}`} product={p} />)}
           </div>
         </div>
       )}
