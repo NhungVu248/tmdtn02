@@ -85,6 +85,8 @@ export async function getOrder(req, res, next) {
     res.json({
       order: {
         ...summary(booking),
+        nights: booking.nights,
+        note: booking.note,
         discountCode: booking.discountCode,
         discountAmount: booking.discountAmount,
         transactionId: booking.transactionId,

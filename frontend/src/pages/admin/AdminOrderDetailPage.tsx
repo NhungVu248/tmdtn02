@@ -103,9 +103,19 @@ export function AdminOrderDetailPage() {
           <h2 className="mb-3 font-semibold text-slate-200">Sản phẩm & khách</h2>
           <dl className="space-y-1 text-sm">
             <Row label="Sản phẩm" value={`${order.productName} (${order.type === 'HOMESTAY' ? 'Homestay' : 'Tour'})`} />
-            <Row label="Khách hàng" value={`${order.guestName} · ${order.guestEmail} · ${order.guestPhone}`} />
-            <Row label="Ngày" value={`${fmtDate(order.checkIn)} → ${fmtDate(order.checkOut)}`} />
+            <Row label="Họ tên" value={order.guestName} />
+            <Row label="Email" value={order.guestEmail} />
+            <Row label="Điện thoại" value={order.guestPhone} />
+            {order.type === 'HOMESTAY' ? (
+              <>
+                <Row label="Nhận / trả phòng" value={`${fmtDate(order.checkIn)} → ${fmtDate(order.checkOut)}`} />
+                {order.nights != null && <Row label="Số đêm" value={`${order.nights} đêm`} />}
+              </>
+            ) : (
+              <Row label="Ngày khởi hành" value={fmtDate(order.checkIn)} />
+            )}
             <Row label="Số khách" value={`${order.guests} người lớn${order.children ? ` · ${order.children} trẻ em` : ''}`} />
+            <Row label="Đặt lúc" value={fmtDate(order.createdAt)} />
           </dl>
         </div>
 
@@ -124,8 +134,25 @@ export function AdminOrderDetailPage() {
         </div>
       </div>
 
+      {/* Yêu cầu của khách hàng (từ trường ghi chú khi đặt) */}
+      <div className="mb-6 rounded-xl border border-amber-700/40 bg-amber-950/20 p-5">
+        <h2 className="mb-3 flex items-center gap-2 font-semibold text-amber-200">📝 Yêu cầu của khách hàng</h2>
+        {order.note ? (
+          <ul className="space-y-1.5 text-sm text-slate-200">
+            {order.note.split('|').map((part) => part.trim()).filter(Boolean).map((part, i) => (
+              <li key={i} className="flex gap-2">
+                <span className="text-amber-400">•</span>
+                <span>{part}</span>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-sm text-slate-500">Khách hàng không để lại yêu cầu đặc biệt.</p>
+        )}
+      </div>
+
       <div className="mb-6 rounded-xl border border-slate-800 bg-slate-950 p-5">
-        <h2 className="mb-3 font-semibold text-slate-200">Chuyển trạng thái đơn (BR-85)</h2>
+        <h2 className="mb-3 font-semibold text-slate-200">Chuyển trạng thái đơn</h2>
         {order.allowedTransitions.length === 0 ? (
           <p className="text-sm text-slate-500">Đơn đã ở trạng thái cuối vòng đời, không thể chuyển tiếp.</p>
         ) : (

@@ -536,6 +536,8 @@ export interface AdminOrder {
 }
 
 export interface AdminOrderDetail extends AdminOrder {
+  nights: number | null
+  note: string | null
   discountCode: string | null
   discountAmount: number
   transactionId: string | null
