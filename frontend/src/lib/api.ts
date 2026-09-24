@@ -423,6 +423,7 @@ export const api = {
     guestPhone: string
     acceptedTerms: boolean
     discountCode?: string
+    note?: string
   }) => post<BookingResult>('/api/bookings/homestay', data),
   createTourBooking: (data: {
     slug: string
@@ -434,6 +435,7 @@ export const api = {
     guestPhone: string
     acceptedTerms: boolean
     discountCode?: string
+    note?: string
   }) => post<BookingResult>('/api/bookings/tour', data),
   getPaymentConfig: () => get<{ vnpayEnabled: boolean; codEnabled: boolean; depositRate: number }>('/api/payments/config'),
   createPayment: (code: string, method: 'COD' | 'VNPAY') =>
@@ -521,6 +523,7 @@ export interface BookingInfo {
   guestName: string
   guestEmail: string
   guestPhone: string
+  note?: string | null
   checkIn: string | null
   checkOut: string | null
   nights: number | null

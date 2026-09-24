@@ -30,6 +30,7 @@ function publicBooking(b, productName, productSlug) {
     guestName: b.guestName,
     guestEmail: b.guestEmail,
     guestPhone: b.guestPhone,
+    note: b.note,
     checkIn: b.checkIn,
     checkOut: b.checkOut,
     nights: b.nights,
@@ -62,7 +63,7 @@ async function resolveDiscount({ discountCode, type, productId, propertyId, tour
 // UC-09 – Đặt homestay: giữ chỗ tạm + tạo đơn "chờ cọc". Hỗ trợ guest checkout.
 export async function createHomestayBooking(req, res, next) {
   try {
-    const { slug, checkIn, checkOut, guests, roomTypeId, guestName, guestEmail, guestPhone, acceptedTerms, discountCode } = req.body
+    const { slug, checkIn, checkOut, guests, roomTypeId, guestName, guestEmail, guestPhone, acceptedTerms, discountCode, note } = req.body
 
     // BR-28 / 5a: bắt buộc đồng ý điều khoản.
     if (!acceptedTerms) {
@@ -146,6 +147,7 @@ export async function createHomestayBooking(req, res, next) {
           guestName,
           guestEmail,
           guestPhone,
+          note: note?.trim() || null,
           checkIn: parseUtcDate(checkIn),
           checkOut: parseUtcDate(checkOut),
           nights: nights.length,
@@ -179,7 +181,7 @@ export async function createHomestayBooking(req, res, next) {
 // UC-10 – Đặt tour: giữ chỗ theo số ghế của một chuyến khởi hành + tạo đơn "chờ cọc".
 export async function createTourBooking(req, res, next) {
   try {
-    const { slug, date, guests, children, guestName, guestEmail, guestPhone, acceptedTerms, discountCode } = req.body
+    const { slug, date, guests, children, guestName, guestEmail, guestPhone, acceptedTerms, discountCode, note } = req.body
 
     if (!acceptedTerms) {
       return res.status(400).json({ message: 'Vui lòng đồng ý điều khoản và chính sách trước khi đặt' }) // 5a
@@ -269,6 +271,7 @@ export async function createTourBooking(req, res, next) {
           guestName,
           guestEmail,
           guestPhone,
+          note: note?.trim() || null,
           checkIn: day, // ngày khởi hành
           nights: null,
           guests: adults,

@@ -218,6 +218,7 @@ model Booking {
   guestName  String
   guestEmail String
   guestPhone String
+  note       String? @db.Text // ghi chú / yêu cầu đặc biệt của khách
 
   // Homestay: khoảng ngày; Tour: ngày khởi hành (dùng lại checkIn)
   checkIn  DateTime? @db.Date

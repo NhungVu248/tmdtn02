@@ -37,6 +37,7 @@ export function BookingPage() {
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [phone, setPhone] = useState('')
+  const [note, setNote] = useState('')
   const [terms, setTerms] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -204,6 +205,7 @@ export function BookingPage() {
         guestPhone: phone,
         acceptedTerms: terms,
         discountCode: applied?.code,
+        note: note.trim() || undefined,
       }
       const r = isTour
         ? await api.createTourBooking({ slug: slug!, date, guests, children, ...contact })
@@ -435,57 +437,88 @@ export function BookingPage() {
   if (missingInfo) {
     return (
       <div className="mx-auto max-w-lg px-4 py-16 text-center">
-        <h1 className="text-xl font-semibold">Thiếu thông tin đặt chỗ</h1>
-        <p className="mt-2 text-slate-500">
+        <h1 className="font-display text-2xl font-semibold text-forest-900">Thiếu thông tin đặt chỗ</h1>
+        <p className="mt-2 text-forest-400">
           Vui lòng chọn {isTour ? 'ngày khởi hành' : 'khoảng ngày'} ở trang chi tiết trước khi đặt.
         </p>
-        <Link to={isTour ? `/tour/${slug}` : `/product/${slug}`} className="mt-6 inline-block rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700">
+        <Link to={isTour ? `/tour/${slug}` : `/product/${slug}`} className="mt-6 inline-block rounded-full bg-forest-700 px-5 py-2 text-sm font-medium text-cream-50 hover:bg-forest-800">
           ← Về trang {isTour ? 'tour' : 'sản phẩm'}
         </Link>
       </div>
     )
   }
 
-  const field = 'w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none'
+  const field =
+    'w-full rounded-xl border border-cream-300 bg-white px-3.5 py-2.5 text-sm text-forest-900 placeholder:text-forest-300 focus:border-forest-400 focus:outline-none focus:ring-2 focus:ring-forest-100'
+  const lbl = 'mb-1.5 block text-sm font-medium text-forest-700'
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-8">
-      <h1 className="mb-6 text-2xl font-bold">Xác nhận đặt {isTour ? 'tour' : 'homestay'}</h1>
+    <div className="mx-auto max-w-5xl px-6 py-10">
+      <nav className="mb-3 text-sm text-forest-400">
+        <Link to={isTour ? `/tour/${slug}` : `/product/${slug}`} className="hover:text-forest-700">
+          {product.name}
+        </Link>{' '}
+        / <span className="text-forest-700">Đặt chỗ</span>
+      </nav>
+      <h1 className="mb-6 font-display text-4xl font-semibold text-forest-900">Xác nhận đặt {isTour ? 'tour' : 'homestay'}</h1>
 
-      <div className="gap-6 lg:flex">
-        <form onSubmit={submit} className="flex-1 space-y-4">
+      <div className="gap-8 lg:flex lg:items-start">
+        <form onSubmit={submit} className="flex-1 space-y-5">
           {!user && (
-            <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-              Bạn đang đặt với tư cách khách.{' '}
-              <Link to={`/login?returnTo=${encodeURIComponent(location.pathname + location.search)}`} className="font-medium text-emerald-700 hover:underline">
+            <div className="rounded-2xl border border-cream-200 bg-cream-100/60 px-4 py-3 text-sm text-forest-600">
+              👤 Bạn đang đặt với tư cách khách.{' '}
+              <Link to={`/login?returnTo=${encodeURIComponent(location.pathname + location.search)}`} className="font-medium text-clay-600 hover:underline">
                 Đăng nhập
               </Link>{' '}
-              để lưu đơn vào tài khoản.
+              để lưu đơn vào tài khoản &amp; tự điền thông tin.
             </div>
           )}
-          <div className="rounded-xl border border-slate-200 bg-white p-5">
-            <h2 className="mb-4 font-semibold">Thông tin người đặt</h2>
-            <div className="space-y-3">
-              <input className={field} placeholder="Họ tên *" value={name} onChange={(e) => setName(e.target.value)} />
-              <input className={field} type="email" placeholder="Email *" value={email} onChange={(e) => setEmail(e.target.value)} />
-              <input className={field} placeholder="Số điện thoại *" value={phone} onChange={(e) => setPhone(e.target.value)} />
+
+          <div className="rounded-3xl border border-cream-200 bg-white p-6">
+            <h2 className="mb-4 font-display text-xl font-semibold text-forest-900">Thông tin người đặt</h2>
+            <div className="space-y-4">
+              <div>
+                <label className={lbl}>Họ và tên <span className="text-clay-500">*</span></label>
+                <input className={field} placeholder="Nguyễn Văn A" value={name} onChange={(e) => setName(e.target.value)} />
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label className={lbl}>Email <span className="text-clay-500">*</span></label>
+                  <input className={field} type="email" placeholder="email@example.com" value={email} onChange={(e) => setEmail(e.target.value)} />
+                </div>
+                <div>
+                  <label className={lbl}>Số điện thoại <span className="text-clay-500">*</span></label>
+                  <input className={field} placeholder="0901234567" value={phone} onChange={(e) => setPhone(e.target.value)} />
+                </div>
+              </div>
+              <div>
+                <label className={lbl}>Ghi chú / yêu cầu đặc biệt <span className="font-normal text-forest-300">(không bắt buộc)</span></label>
+                <textarea
+                  className={`${field} min-h-24`}
+                  placeholder="VD: nhận phòng sớm, thêm giường phụ, đón sân bay..."
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                />
+              </div>
             </div>
           </div>
 
-          <div className="rounded-xl border border-slate-200 bg-white p-5 text-sm text-slate-600">
-            <h2 className="mb-2 font-semibold text-slate-900">Chính sách hủy</h2>
-            <p>{product.cancellationPolicy}</p>
+          <div className="rounded-3xl border border-cream-200 bg-white p-6 text-sm text-forest-500">
+            <h2 className="mb-2 flex items-center gap-2 font-display text-lg font-semibold text-forest-900">
+              <span className="text-clay-500">🛈</span> Chính sách hủy
+            </h2>
+            <p className="leading-relaxed">{product.cancellationPolicy}</p>
           </div>
 
-          {/* UC-12 – Áp dụng mã giảm giá (extend UC-09/10) */}
-          <div className="rounded-xl border border-slate-200 bg-white p-5">
-            <h2 className="mb-3 font-semibold">Mã giảm giá</h2>
+          {/* Áp dụng mã giảm giá */}
+          <div className="rounded-3xl border border-cream-200 bg-white p-6">
+            <h2 className="mb-3 font-display text-lg font-semibold text-forest-900">Mã giảm giá</h2>
             {applied ? (
-              <div className="flex items-center justify-between rounded-lg bg-emerald-50 px-3 py-2 text-sm">
-                <span className="font-medium text-emerald-700">
+              <div className="flex items-center justify-between rounded-xl bg-forest-50 px-4 py-3 text-sm">
+                <span className="font-medium text-forest-700">
                   ✓ Đã áp dụng <span className="font-mono">{applied.code}</span> · giảm {formatPrice(applied.discount)}
                 </span>
-                <button type="button" onClick={removeDiscount} className="text-emerald-700 underline hover:text-emerald-800">
+                <button type="button" onClick={removeDiscount} className="text-clay-600 underline hover:text-clay-700">
                   Gỡ mã
                 </button>
               </div>
@@ -493,7 +526,7 @@ export function BookingPage() {
               <div className="flex gap-2">
                 <input
                   className={`${field} flex-1 uppercase`}
-                  placeholder="Nhập mã giảm giá"
+                  placeholder="NHẬP MÃ GIẢM GIÁ"
                   value={discountInput}
                   onChange={(e) => setDiscountInput(e.target.value.toUpperCase())}
                 />
@@ -501,7 +534,7 @@ export function BookingPage() {
                   type="button"
                   onClick={applyDiscountCode}
                   disabled={applyingDiscount || !discountInput.trim()}
-                  className="shrink-0 rounded-lg border border-emerald-600 px-4 py-2 text-sm font-medium text-emerald-700 hover:bg-emerald-50 disabled:opacity-50"
+                  className="shrink-0 rounded-xl border border-forest-300 px-5 py-2 text-sm font-medium text-forest-700 hover:bg-forest-50 disabled:opacity-50"
                 >
                   {applyingDiscount ? 'Đang kiểm tra...' : 'Áp dụng'}
                 </button>
@@ -510,65 +543,77 @@ export function BookingPage() {
             {discountMsg && <p className="mt-2 text-sm text-red-600">{discountMsg}</p>}
           </div>
 
-          <label className="flex items-start gap-2 text-sm text-slate-600">
-            <input type="checkbox" className="mt-1" checked={terms} onChange={(e) => setTerms(e.target.checked)} />
+          <label className="flex items-start gap-2.5 text-sm text-forest-600">
+            <input type="checkbox" className="mt-1 accent-forest-700" checked={terms} onChange={(e) => setTerms(e.target.checked)} />
             <span>
               Tôi đã đọc và đồng ý với{' '}
-              <Link to="/info/dieu-kien-giao-dich" target="_blank" className="text-emerald-700 hover:underline">Điều khoản</Link> và{' '}
-              <Link to="/info/bao-mat-du-lieu" target="_blank" className="text-emerald-700 hover:underline">Chính sách bảo vệ dữ liệu cá nhân</Link>.
+              <Link to="/info/dieu-kien-giao-dich" target="_blank" className="font-medium text-clay-600 hover:underline">Điều khoản</Link> và{' '}
+              <Link to="/info/bao-mat-du-lieu" target="_blank" className="font-medium text-clay-600 hover:underline">Chính sách bảo vệ dữ liệu cá nhân</Link>.
             </span>
           </label>
 
-          {error && <div className="rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>}
+          {error && <div className="rounded-xl border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>}
 
           <button
             type="submit"
             disabled={submitting}
-            className="w-full rounded-lg bg-emerald-600 px-4 py-3 font-semibold text-white hover:bg-emerald-700 disabled:opacity-50 lg:w-auto"
+            className="w-full rounded-full bg-forest-700 px-6 py-3.5 font-semibold text-cream-50 shadow-lg transition hover:bg-forest-800 disabled:opacity-50"
           >
             {submitting ? 'Đang xử lý...' : `Xác nhận & đặt cọc ${formatPrice(deposit)}`}
           </button>
         </form>
 
-        <aside className="mt-6 w-full lg:mt-0 lg:w-80 lg:shrink-0">
-          <div className="rounded-xl border border-slate-200 bg-white p-5">
-            <h2 className="mb-3 font-semibold">{product.name}</h2>
-            <div className="space-y-1 text-sm text-slate-600">
-              {isTour ? (
-                <>
-                  <Row label="Ngày khởi hành" value={new Date(date).toLocaleDateString('vi-VN')} />
-                  <Row label="Người lớn" value={`${guests}`} />
-                  {children > 0 && <Row label="Trẻ em" value={`${children}`} />}
-                </>
-              ) : (
-                <>
-                  <Row label="Nhận phòng" value={new Date(from).toLocaleDateString('vi-VN')} />
-                  <Row label="Trả phòng" value={new Date(to).toLocaleDateString('vi-VN')} />
-                  <Row label="Số đêm" value={`${nights} đêm`} />
-                  <Row label="Số khách" value={`${guests} khách`} />
-                </>
-              )}
-            </div>
-            <hr className="my-3 border-slate-100" />
-            <div className="space-y-1 text-sm">
-              {isTour ? (
-                <>
-                  <Row label={`Người lớn ${formatPrice(product.price)} × ${guests}`} value={formatPrice(product.price * guests)} />
-                  {children > 0 && (
-                    <Row label={`Trẻ em ${formatPrice(priceChild)} × ${children}`} value={formatPrice(priceChild * children)} />
-                  )}
-                </>
-              ) : (
-                <Row label={`Giá ${formatPrice(product.price)} × ${nights} đêm`} value={formatPrice(total)} />
-              )}
-              {applied && (
-                <>
-                  <Row label={`Mã giảm giá (${applied.code})`} value={`-${formatPrice(applied.discount)}`} />
-                  <Row label="Tổng sau giảm" value={formatPrice(payableTotal)} />
-                </>
-              )}
-              <Row label={`Đặt cọc (${Math.round(depositRate * 100)}%)`} value={formatPrice(deposit)} strong />
-              <Row label="Còn lại (trả sau)" value={formatPrice(remaining)} />
+        {/* Tóm tắt đơn (dính khi cuộn) */}
+        <aside className="mt-6 w-full lg:sticky lg:top-24 lg:mt-0 lg:w-96 lg:shrink-0">
+          <div className="overflow-hidden rounded-3xl border border-cream-200 bg-white">
+            {product.thumbnail && (
+              <img src={product.thumbnail} alt={product.name} className="h-40 w-full object-cover" />
+            )}
+            <div className="p-6">
+              <h2 className="font-display text-lg font-semibold text-forest-900">{product.name}</h2>
+              {product.location && <p className="mt-0.5 text-sm text-forest-400">📍 {product.location}</p>}
+
+              <div className="mt-4 space-y-1.5 border-t border-cream-100 pt-4 text-sm">
+                {isTour ? (
+                  <>
+                    <Row label="Ngày khởi hành" value={new Date(date).toLocaleDateString('vi-VN')} />
+                    <Row label="Người lớn" value={`${guests}`} />
+                    {children > 0 && <Row label="Trẻ em" value={`${children}`} />}
+                  </>
+                ) : (
+                  <>
+                    <Row label="Nhận phòng" value={new Date(from).toLocaleDateString('vi-VN')} />
+                    <Row label="Trả phòng" value={new Date(to).toLocaleDateString('vi-VN')} />
+                    <Row label="Số đêm" value={`${nights} đêm`} />
+                    <Row label="Số khách" value={`${guests} khách`} />
+                  </>
+                )}
+              </div>
+
+              <div className="mt-4 space-y-1.5 border-t border-cream-100 pt-4 text-sm">
+                {isTour ? (
+                  <>
+                    <Row label={`Người lớn ${formatPrice(product.price)} × ${guests}`} value={formatPrice(product.price * guests)} />
+                    {children > 0 && (
+                      <Row label={`Trẻ em ${formatPrice(priceChild)} × ${children}`} value={formatPrice(priceChild * children)} />
+                    )}
+                  </>
+                ) : (
+                  <Row label={`Giá ${formatPrice(product.price)} × ${nights} đêm`} value={formatPrice(total)} />
+                )}
+                {applied && (
+                  <>
+                    <Row label={`Mã giảm giá (${applied.code})`} value={`-${formatPrice(applied.discount)}`} />
+                    <Row label="Tổng sau giảm" value={formatPrice(payableTotal)} />
+                  </>
+                )}
+                <Row label="Còn lại (trả sau)" value={formatPrice(remaining)} />
+              </div>
+
+              <div className="mt-4 flex items-center justify-between rounded-2xl bg-forest-700 px-5 py-4 text-cream-50">
+                <span className="text-sm">Đặt cọc ({Math.round(depositRate * 100)}%)</span>
+                <span className="font-display text-2xl font-bold">{formatPrice(deposit)}</span>
+              </div>
             </div>
           </div>
         </aside>
