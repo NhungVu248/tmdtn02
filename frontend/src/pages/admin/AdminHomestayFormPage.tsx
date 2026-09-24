@@ -30,6 +30,21 @@ export function AdminHomestayFormPage() {
   const [loaded, setLoaded] = useState(!isEdit)
   const set = (k: keyof typeof empty, v: string) => setF((p) => ({ ...p, [k]: v }))
 
+  // "➕ Thêm mới…": hỏi tên, tạo tỉnh/khu vực mới rồi chọn luôn (BR: danh mục do admin tự mở rộng).
+  async function onCatSelect(kind: 'province' | 'area', value: string) {
+    const key = kind === 'province' ? 'provinceId' : 'areaId'
+    if (value !== '__new__') { set(key, value); return }
+    const name = window.prompt(kind === 'province' ? 'Tên tỉnh/thành mới:' : 'Tên khu vực mới:')?.trim()
+    if (!name) return
+    try {
+      const { category } = await adminApi.createHomestayCategory(kind, name)
+      setMeta((m) => ({ ...m, [kind === 'province' ? 'provinces' : 'areas']: [...m[kind === 'province' ? 'provinces' : 'areas'], category] }))
+      set(key, String(category.id))
+    } catch (err) {
+      setError(err instanceof AdminApiError ? err.message : 'Không thêm được danh mục')
+    }
+  }
+
   useEffect(() => {
     adminApi.getHomestayMeta().then(setMeta).catch(() => {})
   }, [])
@@ -74,7 +89,13 @@ export function AdminHomestayFormPage() {
       if (isEdit && id) { const { property } = await adminApi.updateHomestay(Number(id), buildPayload()); fill(property) }
       else { const { property } = await adminApi.createHomestay(buildPayload()); navigate(`/admin/homestays/${property.id}/edit`, { replace: true }); return }
     } catch (err) {
-      setError(err instanceof AdminApiError ? err.message : 'Lưu thất bại.') // 5a
+      // 5a: lỗi từ máy chủ (AdminApiError) hiện nguyên thông báo; lỗi fetch bị reject
+      // (mất kết nối, máy chủ đang khởi động lại) hiện gợi ý thử lại thay vì "Lưu thất bại." chung chung.
+      setError(
+        err instanceof AdminApiError
+          ? err.message
+          : 'Không gửi được yêu cầu đến máy chủ. Kiểm tra kết nối rồi bấm Lưu lại.',
+      )
     } finally { setSaving(false) }
   }
 
@@ -117,13 +138,15 @@ export function AdminHomestayFormPage() {
             <div><label className={label}>Hạng sao</label><input className={field} type="number" min={0} max={5} value={f.starRating} onChange={(e) => set('starRating', e.target.value)} /></div>
             <div className="col-span-2"><label className={label}>Mô tả ngắn</label><input className={field} value={f.shortDescription} onChange={(e) => set('shortDescription', e.target.value)} /></div>
             <div><label className={label}>Tỉnh/Thành</label>
-              <select className={field} value={f.provinceId} onChange={(e) => set('provinceId', e.target.value)}>
+              <select className={field} value={f.provinceId} onChange={(e) => onCatSelect('province', e.target.value)}>
                 <option value="">— Chọn —</option>{meta.provinces.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                <option value="__new__">➕ Thêm tỉnh/thành mới…</option>
               </select>
             </div>
             <div><label className={label}>Khu vực</label>
-              <select className={field} value={f.areaId} onChange={(e) => set('areaId', e.target.value)}>
+              <select className={field} value={f.areaId} onChange={(e) => onCatSelect('area', e.target.value)}>
                 <option value="">— Chọn —</option>{meta.areas.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                <option value="__new__">➕ Thêm khu vực mới…</option>
               </select>
             </div>
             <div className="col-span-2"><label className={label}>Địa chỉ đầy đủ</label><input className={field} value={f.address} onChange={(e) => set('address', e.target.value)} /></div>

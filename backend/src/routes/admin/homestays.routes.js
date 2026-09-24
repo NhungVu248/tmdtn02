@@ -2,6 +2,7 @@ import { Router } from 'express'
 import {
   addImage,
   createHomestay,
+  createHomestayCategory,
   createRoomType,
   deleteRoomType,
   getHomestay,
@@ -26,6 +27,7 @@ router.use(requireAdmin)
 // Upload ảnh (BR-76) — đặt trước các route /:id để tránh nhầm "uploads" thành id.
 router.post('/uploads/image', uploadImage.single('file'), uploadFile)
 router.get('/meta', homestayMeta)
+router.post('/categories', createHomestayCategory)
 
 router.get('/', listHomestays)
 router.post('/', createHomestay)

@@ -170,6 +170,8 @@ export const adminApi = {
       { status },
     ),
   getHomestayMeta: () => get<{ provinces: AdminPropertyCat[]; areas: AdminPropertyCat[]; amenities: AdminAmenity[]; policies: { id: number; name: string }[] }>('/api/admin/homestays/meta'),
+  createHomestayCategory: (kind: 'province' | 'area', name: string) =>
+    post<{ category: AdminPropertyCat }>('/api/admin/homestays/categories', { kind, name }),
   uploadImage: async (file: File) => {
     const form = new FormData()
     form.append('file', file)

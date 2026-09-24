@@ -77,6 +77,28 @@ export async function homestayMeta(req, res, next) {
   }
 }
 
+// Tạo mới tỉnh/thành hoặc khu vực ngay từ form (khi danh sách có sẵn chưa có).
+export async function createHomestayCategory(req, res, next) {
+  try {
+    const name = str(req.body.name)
+    const kind = req.body.kind === 'area' ? 'area' : 'province'
+    if (!name) return res.status(400).json({ message: 'Thiếu tên' })
+    // slug duy nhất trong toàn bảng Category; nối kind + hậu tố nếu trùng.
+    let base = slugify(name) || kind
+    let slug = `${kind}-${base}`
+    let n = 1
+    while (await prisma.category.findUnique({ where: { slug } })) slug = `${kind}-${base}-${++n}`
+    const maxOrder = await prisma.category.aggregate({ where: { type: 'HOMESTAY', kind }, _max: { order: true } })
+    const category = await prisma.category.create({
+      data: { name, slug, type: 'HOMESTAY', kind, order: (maxOrder._max.order ?? 0) + 1 },
+    })
+    await logAdminAction(req.admin.sub, 'category.create', { entityType: 'Category', entityId: category.id, detail: { name, kind } })
+    res.status(201).json({ category })
+  } catch (err) {
+    next(err)
+  }
+}
+
 function scalarData(body) {
   return {
     name: str(body.name),
