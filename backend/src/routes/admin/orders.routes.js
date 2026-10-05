@@ -1,5 +1,5 @@
 import { Router } from 'express'
-import { getOrder, listOrders, processRefund, updateOrderStatus } from '../../controllers/admin/orders.controller.js'
+import { bulkUpdateOrderStatus, getOrder, listOrders, processRefund, updateOrderStatus } from '../../controllers/admin/orders.controller.js'
 import { requireAdmin } from '../../middleware/adminAuth.middleware.js'
 
 const router = Router()
@@ -8,6 +8,8 @@ const router = Router()
 router.use(requireAdmin)
 
 router.get('/', listOrders)
+// Nhập Excel: cập nhật trạng thái hàng loạt — đặt trước /:code để không bị nuốt thành mã đơn.
+router.post('/bulk-status', bulkUpdateOrderStatus)
 router.get('/:code', getOrder)
 router.patch('/:code/status', updateOrderStatus)
 router.post('/:code/refunds/:refundId/process', processRefund)

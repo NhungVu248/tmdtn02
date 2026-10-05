@@ -37,7 +37,7 @@ function summary(b) {
 // UC-18 – Danh sách đơn (mọi trạng thái) kèm bộ lọc theo trạng thái/loại/thời gian/tìm kiếm.
 export async function listOrders(req, res, next) {
   try {
-    const { status, type, from, to, search } = req.query
+    const { status, type, from, to, search, minTotal, maxTotal } = req.query
     const where = {}
     if (status) where.status = String(status)
     if (type === 'HOMESTAY' || type === 'TOUR') where.type = type
@@ -45,6 +45,14 @@ export async function listOrders(req, res, next) {
       where.createdAt = {}
       if (from) where.createdAt.gte = new Date(String(from))
       if (to) where.createdAt.lte = new Date(new Date(String(to)).getTime() + 86400000)
+    }
+    // Khoảng giá theo tổng tiền đơn (BR: lọc theo giá).
+    const min = minTotal != null && minTotal !== '' ? Number(minTotal) : null
+    const max = maxTotal != null && maxTotal !== '' ? Number(maxTotal) : null
+    if ((min != null && !Number.isNaN(min)) || (max != null && !Number.isNaN(max))) {
+      where.totalPrice = {}
+      if (min != null && !Number.isNaN(min)) where.totalPrice.gte = min
+      if (max != null && !Number.isNaN(max)) where.totalPrice.lte = max
     }
     if (search) {
       const s = String(search).trim()
@@ -132,6 +140,45 @@ async function releaseInventoryOps(booking) {
   return ops
 }
 
+// Áp dụng chuyển trạng thái cho MỘT đơn theo đúng vòng đời (BR-85). Trả { updated } hoặc ném lỗi có .statusCode.
+// Dùng chung cho đổi trạng thái đơn lẻ và nhập Excel hàng loạt.
+async function changeBookingStatus(booking, status, adminSub) {
+  const allowed = TRANSITIONS[booking.status] || []
+  if (!allowed.includes(status)) {
+    const err = new Error(`Không thể chuyển đơn từ "${booking.status}" sang "${status}" (trái vòng đời đơn — BR-85)`)
+    err.statusCode = 409
+    throw err
+  }
+
+  const ops = []
+  if (status === 'CANCELLED') {
+    ops.push(...(await releaseInventoryOps(booking)))
+  }
+  const bookingUpdateIndex = ops.length
+  ops.push(
+    prisma.booking.update({
+      where: { id: booking.id },
+      data: { status, ...(status === 'CANCELLED' ? { cancelledAt: new Date() } : {}) },
+    }),
+  )
+
+  const results = await prisma.$transaction(ops)
+  const updated = results[bookingUpdateIndex]
+
+  await logAdminAction(adminSub, 'order.status', {
+    entityType: 'Booking',
+    entityId: booking.id,
+    detail: { from: booking.status, to: status },
+  })
+
+  // BR-90: thông báo cho người dùng khi trạng thái đơn thay đổi (gửi nền, không chặn response).
+  sendOrderStatusEmail(booking.guestEmail, { code: booking.code, productName: booking.tour?.title ?? booking.property?.name ?? '', status }).catch(
+    (e) => console.error('Gửi email cập nhật đơn thất bại:', e),
+  )
+
+  return updated
+}
+
 // UC-18 (3/3a) – Chuyển trạng thái đơn theo đúng vòng đời (BR-85).
 // Ngoại lệ 3a: chuyển trạng thái không hợp lệ (vd "đã hủy" -> "hoàn tất") -> từ chối.
 export async function updateOrderStatus(req, res, next) {
@@ -141,40 +188,48 @@ export async function updateOrderStatus(req, res, next) {
     const booking = await prisma.booking.findUnique({ where: { code }, include: { property: true, tour: true } })
     if (!booking) return res.status(404).json({ message: 'Không tìm thấy đơn' })
 
-    const allowed = TRANSITIONS[booking.status] || []
-    if (!allowed.includes(status)) {
-      return res.status(409).json({
-        message: `Không thể chuyển đơn từ "${booking.status}" sang "${status}" (trái vòng đời đơn — BR-85)`,
-      }) // 3a
+    let updated
+    try {
+      updated = await changeBookingStatus(booking, status, req.admin.sub)
+    } catch (e) {
+      if (e.statusCode) return res.status(e.statusCode).json({ message: e.message }) // 3a
+      throw e
     }
-
-    const ops = []
-    if (status === 'CANCELLED') {
-      ops.push(...(await releaseInventoryOps(booking)))
-    }
-    const bookingUpdateIndex = ops.length
-    ops.push(
-      prisma.booking.update({
-        where: { id: booking.id },
-        data: { status, ...(status === 'CANCELLED' ? { cancelledAt: new Date() } : {}) },
-      }),
-    )
-
-    const results = await prisma.$transaction(ops)
-    const updated = results[bookingUpdateIndex]
-
-    await logAdminAction(req.admin.sub, 'order.status', {
-      entityType: 'Booking',
-      entityId: booking.id,
-      detail: { from: booking.status, to: status },
-    })
-
-    // BR-90: thông báo cho người dùng khi trạng thái đơn thay đổi (gửi nền, không chặn response).
-    sendOrderStatusEmail(booking.guestEmail, { code: booking.code, productName: booking.tour?.title ?? booking.property?.name ?? "", status }).catch(
-      (e) => console.error('Gửi email cập nhật đơn thất bại:', e),
-    )
 
     res.json({ order: { ...summary({ ...booking, ...updated, property: booking.property, tour: booking.tour }), allowedTransitions: TRANSITIONS[updated.status] || [] } })
+  } catch (err) {
+    next(err)
+  }
+}
+
+// Nhập Excel: cập nhật trạng thái hàng loạt. Body: { rows: [{ code, status }] }.
+// Xử lý từng dòng độc lập, báo cáo dòng thành công/lỗi (không dừng ở dòng lỗi đầu tiên).
+const VALID_STATUSES = ['PENDING_DEPOSIT', 'DEPOSITED', 'CONFIRMED', 'COMPLETED', 'CANCELLED']
+export async function bulkUpdateOrderStatus(req, res, next) {
+  try {
+    const rows = Array.isArray(req.body?.rows) ? req.body.rows : []
+    if (!rows.length) return res.status(400).json({ message: 'Không có dòng dữ liệu nào để nhập' })
+    if (rows.length > 1000) return res.status(400).json({ message: 'Tối đa 1000 dòng mỗi lần nhập' })
+
+    const results = []
+    let updatedCount = 0
+    for (const row of rows) {
+      const code = String(row?.code || '').trim().toUpperCase()
+      const status = String(row?.status || '').trim().toUpperCase()
+      if (!code) { results.push({ code: row?.code ?? '', ok: false, message: 'Thiếu mã đơn' }); continue }
+      if (!VALID_STATUSES.includes(status)) { results.push({ code, ok: false, message: `Trạng thái không hợp lệ: "${row?.status}"` }); continue }
+      const booking = await prisma.booking.findUnique({ where: { code }, include: { property: true, tour: true } })
+      if (!booking) { results.push({ code, ok: false, message: 'Không tìm thấy đơn' }); continue }
+      if (booking.status === status) { results.push({ code, ok: true, message: 'Không đổi (đã ở trạng thái này)', skipped: true }); continue }
+      try {
+        await changeBookingStatus(booking, status, req.admin.sub)
+        updatedCount++
+        results.push({ code, ok: true, message: `${booking.status} → ${status}` })
+      } catch (e) {
+        results.push({ code, ok: false, message: e.message || 'Lỗi cập nhật' })
+      }
+    }
+    res.json({ updatedCount, total: rows.length, results })
   } catch (err) {
     next(err)
   }

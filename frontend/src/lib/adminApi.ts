@@ -279,15 +279,22 @@ export const adminApi = {
   },
 
   // UC-18 – Quản lý đơn & xử lý hủy/hoàn tiền
-  listOrders: (params: { status?: string; type?: string; from?: string; to?: string; search?: string } = {}) => {
+  listOrders: (params: { status?: string; type?: string; from?: string; to?: string; search?: string; minTotal?: string; maxTotal?: string } = {}) => {
     const qs = new URLSearchParams()
     if (params.status) qs.set('status', params.status)
     if (params.type) qs.set('type', params.type)
     if (params.from) qs.set('from', params.from)
     if (params.to) qs.set('to', params.to)
     if (params.search) qs.set('search', params.search)
+    if (params.minTotal) qs.set('minTotal', params.minTotal)
+    if (params.maxTotal) qs.set('maxTotal', params.maxTotal)
     return get<{ items: AdminOrder[] }>(`/api/admin/orders?${qs.toString()}`)
   },
+  bulkUpdateOrderStatus: (rows: { code: string; status: string }[]) =>
+    post<{ updatedCount: number; total: number; results: { code: string; ok: boolean; message: string; skipped?: boolean }[] }>(
+      '/api/admin/orders/bulk-status',
+      { rows },
+    ),
   getOrder: (code: string) =>
     get<{ order: AdminOrderDetail; payments: AdminPayment[]; refundRequests: AdminRefundRequest[] }>(
       `/api/admin/orders/${code}`,
