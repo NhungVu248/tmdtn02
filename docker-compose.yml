@@ -1,0 +1,61 @@
+# ===================================================================
+# StayTour — Docker Compose: MySQL + Backend (API) + Frontend (web)
+# Chạy tất cả bằng 1 lệnh:  docker compose up -d --build
+# Web khách     : http://localhost:8080
+# Khu vực admin : http://localhost:8080/admin   (admin / Admin@123456)
+# API           : http://localhost:4000
+# ===================================================================
+services:
+  db:
+    image: mysql:8.0
+    command: --default-authentication-plugin=mysql_native_password
+    environment:
+      MYSQL_ROOT_PASSWORD: staytour123
+      MYSQL_DATABASE: tmdt
+    volumes:
+      - db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-pstaytour123"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    restart: unless-stopped
+
+  backend:
+    build: ./backend
+    environment:
+      DATABASE_URL: "mysql://root:staytour123@db:3306/tmdt"
+      JWT_SECRET: "doi_thanh_chuoi_ngau_nhien_cua_ban"
+      JWT_EXPIRES_IN: "7d"
+      ADMIN_JWT_SECRET: "doi_thanh_chuoi_ngau_nhien_khac"
+      ADMIN_JWT_EXPIRES_IN: "8h"
+      PORT: "4000"
+      CLIENT_URL: "http://localhost:8080"
+      BACKEND_URL: "http://localhost:4000"
+      SEED_ADMIN_USERNAME: "admin"
+      SEED_ADMIN_PASSWORD: "Admin@123456"
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "4000:4000"
+    volumes:
+      - uploads_data:/app/uploads
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        # URL API mà trình duyệt gọi tới. Khi deploy lên VPS/domain, đổi thành
+        # địa chỉ API công khai (vd http://<IP-hoặc-domain>:4000).
+        VITE_API_URL: "http://localhost:4000"
+    depends_on:
+      - backend
+    ports:
+      - "8080:80"
+    restart: unless-stopped
+
+volumes:
+  db_data:
+  uploads_data:
