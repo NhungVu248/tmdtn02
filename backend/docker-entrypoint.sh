@@ -15,7 +15,14 @@ if [ ! -f /app/uploads/.seeded ]; then
   echo "[entrypoint] Lần chạy đầu — seed dữ liệu mẫu..."
   if npm run db:seed; then
     touch /app/uploads/.seeded
-    echo "[entrypoint] Seed xong."
+    echo "[entrypoint] Seed catalog xong."
+    # Dữ liệu demo cho bảo vệ: tài khoản khách hàng, đơn đủ trạng thái, đánh giá,
+    # hoàn tiền, yêu thích, token đánh giá (UC-15). Lỗi ở bước này không chặn server.
+    if npm run db:seed:demo; then
+      echo "[entrypoint] Seed dữ liệu demo xong."
+    else
+      echo "[entrypoint] Seed dữ liệu demo thất bại (bỏ qua, server vẫn chạy)."
+    fi
   else
     echo "[entrypoint] Seed thất bại (bỏ qua, server vẫn chạy)."
   fi
