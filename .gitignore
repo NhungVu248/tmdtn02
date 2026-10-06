@@ -21,3 +21,6 @@ prisma/*.db
 .idea/
 .DS_Store
 Thumbs.db
+
+# thư mục tạm của phiên làm việc (không đưa vào repo)
+scratchpad/
