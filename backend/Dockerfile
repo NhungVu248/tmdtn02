@@ -17,7 +17,9 @@ COPY . .
 
 # Entrypoint: chờ DB -> đồng bộ schema -> seed lần đầu -> chạy server
 COPY docker-entrypoint.sh /usr/local/bin/entrypoint.sh
-RUN chmod +x /usr/local/bin/entrypoint.sh
+# Xoá ký tự CR (\r) phòng khi file bị checkout kiểu Windows (CRLF) — nếu không,
+# dòng shebang "#!/bin/sh\r" sẽ khiến Linux báo "no such file or directory".
+RUN sed -i 's/\r$//' /usr/local/bin/entrypoint.sh && chmod +x /usr/local/bin/entrypoint.sh
 
 EXPOSE 4000
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]

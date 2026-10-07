@@ -1,0 +1,4 @@
+# Script shell PHẢI dùng xuống dòng LF để chạy được trong Docker/Linux.
+# Nếu bị checkout kiểu Windows (CRLF), dòng shebang "#!/bin/sh\r" sẽ gây lỗi
+# "exec entrypoint.sh: no such file or directory" khi chạy container.
+*.sh text eol=lf
