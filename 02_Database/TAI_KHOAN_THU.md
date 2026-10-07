@@ -39,37 +39,37 @@
 
 | Mã đơn | Loại | Trạng thái | Chủ đơn | Dùng để demo |
 |--------|------|-----------|---------|--------------|
-| `BK-HMKV8BQEK` | Homestay | Đã cọc (DEPOSITED) | Khách hàng A | thanh toán cọc VNPAY thành công |
-| `BK-CXKPF4N3C` | Homestay | Chờ cọc (PENDING) | Khách hàng A | đơn đang giữ chỗ, chờ thanh toán |
-| `BK-9N2AK384J` | Homestay | Hoàn tất (COMPLETED) | Khách hàng A | **đã có đánh giá 5★** (hiển thị công khai) |
-| `BK-CVAE5JWN9` | Tour | Đã xác nhận (CONFIRMED) | Khách hàng A | đơn tour sắp khởi hành |
-| `BK-QZRKWLDVE` | Tour | Hoàn tất (COMPLETED) | Khách hàng A | **đánh giá đang CHỜ DUYỆT** (demo kiểm duyệt admin) |
-| `BK-U7USS2QZQ` | Tour | Đã hủy (CANCELLED) | Khách hàng B | **có yêu cầu hoàn tiền 50%** chờ xử lý |
-| `BK-DSYCDVJMW` | Homestay | Hoàn tất (COMPLETED) | Khách vãng lai | đã gửi **mail mời đánh giá (UC-15)** — xem 3.2 |
-| `BK-DKJ9F8QPE` | Homestay | Chờ cọc (PENDING) | Khách vãng lai | **tra cứu đơn (UC-13)** — PIN `123456` |
+| `BK-62TBB8X92` | Homestay | Đã cọc (DEPOSITED) | Khách hàng A | thanh toán cọc VNPAY thành công |
+| `BK-FDN5MGW92` | Homestay | Chờ cọc (PENDING) | Khách hàng A | đơn đang giữ chỗ, chờ thanh toán |
+| `BK-QYFJ79XW6` | Homestay | Hoàn tất (COMPLETED) | Khách hàng A | **đã có đánh giá 5★** (hiển thị công khai) |
+| `BK-LQDKQRHEF` | Tour | Đã xác nhận (CONFIRMED) | Khách hàng A | đơn tour sắp khởi hành |
+| `BK-4JS3C8RWT` | Tour | Hoàn tất (COMPLETED) | Khách hàng A | **đánh giá đang CHỜ DUYỆT** (demo kiểm duyệt admin) |
+| `BK-4JDQ7JWUS` | Tour | Đã hủy (CANCELLED) | Khách hàng B | **có yêu cầu hoàn tiền 50%** chờ xử lý |
+| `BK-2PP9QUCAH` | Homestay | Hoàn tất (COMPLETED) | Khách vãng lai | đã gửi **mail mời đánh giá (UC-15)** — xem 3.2 |
+| `BK-VB6HTGJVQ` | Homestay | Chờ cọc (PENDING) | Khách vãng lai | **tra cứu đơn (UC-13)** — PIN `123456` |
 
 ### 3.2 Luồng khách vãng lai đánh giá sau trải nghiệm (UC-15)
-Đơn khách vãng lai `BK-DSYCDVJMW` đã hoàn tất và được cấp sẵn token đánh giá (dùng 1 lần).
+Đơn khách vãng lai `BK-2PP9QUCAH` đã hoàn tất và được cấp sẵn token đánh giá (dùng 1 lần).
 Để demo trang viết đánh giá, mở trực tiếp liên kết:
 ```
-/review?token=75850b91c504819fb141f73e9ad419d821f5692554bb137cd5836493088bf52c
+/review?token=d7aaa8daf31c78ea3cdc87efeb77f5a1ccd133e437b154e557c25f1145331989
 ```
-(Ví dụ đầy đủ khi chạy Docker: `http://localhost:8080/review?token=75850b91...88bf52c`)
+(Ví dụ đầy đủ khi chạy Docker: `http://localhost:8080/review?token=d7aaa8da...31989`)
 
 > Trong vận hành thực tế, liên kết này được gửi tự động qua email sau khi kỳ lưu trú/chuyến
 > đi kết thúc (tác vụ nền quét mỗi 30 phút). Ở chế độ DEV, nội dung mail (kèm link) được in
 > ra console back-end thay vì gửi đi.
 
 ### 3.3 Tra cứu đơn của khách vãng lai (UC-13)
-- Vào `/track`, nhập **Mã đơn** `BK-DKJ9F8QPE` và **PIN** `123456`.
+- Vào `/track`, nhập **Mã đơn** `BK-VB6HTGJVQ` và **PIN** `123456`.
 
 ### 3.4 Mã giảm giá (áp dụng khi đặt)
 - `STAYTOUR10` — giảm 10% tổng đơn.
 - `HE2026` — giảm 150.000đ cho đơn homestay.
 
 ### 3.5 Catalog & nội dung
-- 4 homestay (9 loại phòng) + lịch tồn phòng 120 ngày (có hiển thị "sắp hết phòng").
-- 4 tour + 12 chuyến khởi hành (bảng giá người lớn/trẻ em).
+- **10 homestay** (21 loại phòng) + lịch tồn phòng 120 ngày (có hiển thị "sắp hết phòng").
+- **10 tour** + 30 chuyến khởi hành (bảng giá người lớn/trẻ em).
 - 4 khu vực du lịch, 2 chương trình khuyến mại (banner trang chủ).
 - 8 đánh giá (7 đã duyệt hiển thị công khai + 1 chờ duyệt), các bài thông tin/chính sách,
   1 bài cẩm nang du lịch.

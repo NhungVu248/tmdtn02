@@ -86,6 +86,60 @@ async function main() {
         { name: 'Cabin gỗ', bed: '1 giường đôi', occ: 2, total: 4, price: 1200000, desc: 'Riêng tư, lò sưởi ấm áp.' },
       ],
     },
+    {
+      propertyCode: 'HS005', name: 'Mộc Châu Mộc Homestay', slug: 'moc-chau-moc-homestay',
+      address: 'Mộc Châu, Sơn La', basePrice: 650000, thumb: 'photo-1535139262971-c51845709a48',
+      desc: 'Nhà sàn giữa đồi chè Mộc Châu, săn mây và ngắm hoa mận.',
+      rooms: [
+        { name: 'Phòng cộng đồng', bed: '4 giường đơn', occ: 4, total: 4, price: 650000, desc: 'Ấm cúng cho nhóm bạn.' },
+        { name: 'Nhà sàn riêng', bed: '1 giường lớn', occ: 2, total: 3, price: 1150000, desc: 'View đồi chè, bếp lửa.' },
+      ],
+    },
+    {
+      propertyCode: 'HS006', name: 'Tam Cốc Garden Retreat', slug: 'tam-coc-garden-retreat',
+      address: 'Ninh Bình', basePrice: 1250000, thumb: 'photo-1566073771259-6a8506099945',
+      desc: 'Khu nghỉ sinh thái giữa núi đá Tam Cốc – Tràng An.',
+      rooms: [
+        { name: 'Bungalow vườn', bed: '1 giường đôi', occ: 2, total: 5, price: 1250000, desc: 'Yên bình giữa vườn xanh.' },
+        { name: 'Villa núi đá', bed: '2 giường lớn', occ: 4, total: 2, price: 2200000, desc: 'Hồ bơi riêng, view núi đá.' },
+      ],
+    },
+    {
+      propertyCode: 'HS007', name: 'Sao Biển Phú Quốc', slug: 'sao-bien-phu-quoc',
+      address: 'Phú Quốc, Kiên Giang', basePrice: 1400000, thumb: 'photo-1582719478250-c89cae4dc85b',
+      desc: 'Homestay sát Bãi Sao, cát trắng nước trong, hoàng hôn tuyệt đẹp.',
+      rooms: [
+        { name: 'Phòng vườn nhiệt đới', bed: '1 giường đôi', occ: 2, total: 6, price: 1400000, desc: 'Gần biển, nhiều cây xanh.' },
+        { name: 'Bungalow hướng biển', bed: '1 giường lớn', occ: 2, total: 4, price: 2300000, desc: 'Ngắm hoàng hôn ngay hiên.' },
+      ],
+    },
+    {
+      propertyCode: 'HS008', name: 'Phố Cổ Hà Nội Boutique', slug: 'pho-co-ha-noi-boutique',
+      address: 'Hoàn Kiếm, Hà Nội', basePrice: 900000, thumb: 'photo-1559592413-7cec4d0cae2b',
+      desc: 'Căn hộ ấm cúng giữa phố cổ, đi bộ ra Hồ Gươm 5 phút.',
+      rooms: [
+        { name: 'Phòng Studio', bed: '1 giường đôi', occ: 2, total: 5, price: 900000, desc: 'Gọn gàng, trung tâm phố cổ.' },
+        { name: 'Căn hộ 1 phòng ngủ', bed: '1 giường lớn', occ: 3, total: 3, price: 1500000, desc: 'Bếp riêng, ban công nhìn phố.' },
+      ],
+    },
+    {
+      propertyCode: 'HS009', name: 'Cát Bà Sunrise Bungalow', slug: 'cat-ba-sunrise-bungalow',
+      address: 'Cát Bà, Hải Phòng', basePrice: 800000, thumb: 'photo-1507525428034-b723cf961d3e',
+      desc: 'Bungalow nhìn ra vịnh Lan Hạ, chèo kayak và tắm biển.',
+      rooms: [
+        { name: 'Phòng tiêu chuẩn', bed: '1 giường đôi', occ: 2, total: 8, price: 800000, desc: 'Tiện nghi, gần bến tàu.' },
+        { name: 'Bungalow view vịnh', bed: '1 giường lớn', occ: 2, total: 4, price: 1600000, desc: 'Nhìn thẳng ra vịnh Lan Hạ.' },
+      ],
+    },
+    {
+      propertyCode: 'HS010', name: 'An Nhiên Farmstay Bảo Lộc', slug: 'an-nhien-farmstay-bao-loc',
+      address: 'Bảo Lộc, Lâm Đồng', basePrice: 950000, thumb: 'photo-1618773928121-c32242e63f39',
+      desc: 'Farmstay giữa đồi chè và thác nước, trải nghiệm hái trà.',
+      rooms: [
+        { name: 'Lều glamping', bed: '1 giường đôi', occ: 2, total: 5, price: 950000, desc: 'Cắm trại tiện nghi giữa đồi chè.' },
+        { name: 'Nhà gỗ view thác', bed: '2 giường đôi', occ: 4, total: 2, price: 1900000, desc: 'Gia đình, nghe tiếng thác.' },
+      ],
+    },
   ]
 
   for (const h of homestays) {
@@ -136,6 +190,36 @@ async function main() {
       tourCode: 'TR004', title: 'Kỳ Co – Eo Gió 1 ngày', slug: 'ky-co-eo-gio-1-ngay',
       days: 1, nights: 0, basePrice: 650000, dest: 'Quy Nhơn, Bình Định', from: 'Quy Nhơn',
       thumb: 'photo-1519046904884-53103b34b206', desc: 'Biển Kỳ Co ngọc bích, cano vượt sóng, lặn ngắm san hô.',
+    },
+    {
+      tourCode: 'TR005', title: 'Phú Quốc – Thiên đường biển đảo 3N2Đ', slug: 'phu-quoc-thien-duong-bien-dao-3n2d',
+      days: 3, nights: 2, basePrice: 3200000, dest: 'Phú Quốc, Kiên Giang', from: 'TP. Hồ Chí Minh',
+      thumb: 'photo-1582719478250-c89cae4dc85b', desc: 'Cáp treo Hòn Thơm, câu cá, lặn ngắm san hô và hoàng hôn Bãi Sao.',
+    },
+    {
+      tourCode: 'TR006', title: 'Tràng An – Bái Đính – Hang Múa 1 ngày', slug: 'trang-an-bai-dinh-hang-mua-1-ngay',
+      days: 1, nights: 0, basePrice: 850000, dest: 'Ninh Bình', from: 'Hà Nội',
+      thumb: 'photo-1566073771259-6a8506099945', desc: 'Du thuyền Tràng An, chùa Bái Đính và leo Hang Múa ngắm toàn cảnh.',
+    },
+    {
+      tourCode: 'TR007', title: 'Mộc Châu mùa hoa 2N1Đ', slug: 'moc-chau-mua-hoa-2n1d',
+      days: 2, nights: 1, basePrice: 1650000, dest: 'Mộc Châu, Sơn La', from: 'Hà Nội',
+      thumb: 'photo-1535139262971-c51845709a48', desc: 'Đồi chè trái tim, thác Dải Yếm, rừng thông bản Áng, vườn hoa.',
+    },
+    {
+      tourCode: 'TR008', title: 'Huế – Hành trình di sản 2N1Đ', slug: 'hue-hanh-trinh-di-san-2n1d',
+      days: 2, nights: 1, basePrice: 1950000, dest: 'Huế, Thừa Thiên Huế', from: 'Đà Nẵng',
+      thumb: 'photo-1535139262971-c51845709a48', desc: 'Đại Nội, lăng tẩm, chùa Thiên Mụ và thuyền rồng sông Hương.',
+    },
+    {
+      tourCode: 'TR009', title: 'Nha Trang – Tour 4 đảo 3N2Đ', slug: 'nha-trang-tour-4-dao-3n2d',
+      days: 3, nights: 2, basePrice: 2800000, dest: 'Nha Trang, Khánh Hòa', from: 'TP. Hồ Chí Minh',
+      thumb: 'photo-1507525428034-b723cf961d3e', desc: 'Khám phá 4 đảo, lặn biển, tắm bùn khoáng và VinWonders.',
+    },
+    {
+      tourCode: 'TR010', title: 'Miền Tây – Chợ nổi Cái Răng 2N1Đ', slug: 'mien-tay-cho-noi-cai-rang-2n1d',
+      days: 2, nights: 1, basePrice: 1500000, dest: 'Cần Thơ', from: 'TP. Hồ Chí Minh',
+      thumb: 'photo-1528127269322-539801943592', desc: 'Chợ nổi Cái Răng, vườn trái cây, lò hủ tiếu và đờn ca tài tử.',
     },
   ]
 
