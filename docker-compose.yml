@@ -24,6 +24,12 @@ services:
 
   backend:
     build: ./backend
+    # Nạp thêm biến môi trường từ backend/.env (SMTP email, Google login, VNPAY...).
+    # required:false => máy nào chưa có .env vẫn chạy bình thường (chế độ DEV).
+    # Lưu ý: các biến trong "environment:" bên dưới luôn được ưu tiên hơn .env.
+    env_file:
+      - path: ./backend/.env
+        required: false
     environment:
       DATABASE_URL: "mysql://root:staytour123@db:3306/tmdt"
       JWT_SECRET: "doi_thanh_chuoi_ngau_nhien_cua_ban"
