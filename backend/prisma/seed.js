@@ -6,6 +6,34 @@ const prisma = new PrismaClient()
 // Ảnh minh hoạ (Unsplash) — chỉ dùng cho dữ liệu demo.
 const img = (id, w = 1000) => `https://images.unsplash.com/${id}?auto=format&fit=crop&w=${w}&q=70`
 
+// Kho ảnh dùng chung (các ID Unsplash ổn định) để tạo thư viện nhiều ảnh cho
+// từng homestay/phòng/tour. Dùng lại trong nhiều mục để chắc chắn ảnh hiển thị.
+const PHOTO_POOL = [
+  'photo-1618773928121-c32242e63f39', 'photo-1582719478250-c89cae4dc85b',
+  'photo-1566073771259-6a8506099945', 'photo-1501785888041-af3ef285b470',
+  'photo-1464822759023-fed622ff2c3b', 'photo-1528127269322-539801943592',
+  'photo-1507525428034-b723cf961d3e', 'photo-1519046904884-53103b34b206',
+  'photo-1589820296156-2454bb8a6ad1', 'photo-1559592413-7cec4d0cae2b',
+  'photo-1535139262971-c51845709a48',
+]
+
+// Tạo mảng ảnh (cover + nhiều ảnh phụ) cho quan hệ images: { create: [...] }.
+function gallery(coverId, startIndex, count) {
+  const out = [{ url: img(coverId), isCover: true, sortOrder: 0 }]
+  let added = 1
+  let k = startIndex
+  let guard = 0
+  while (added < count && guard < 100) {
+    guard++
+    const id = PHOTO_POOL[((k % PHOTO_POOL.length) + PHOTO_POOL.length) % PHOTO_POOL.length]
+    k++
+    if (id === coverId || out.some((o) => o.url === img(id))) continue
+    out.push({ url: img(id), isCover: false, sortOrder: added })
+    added++
+  }
+  return out
+}
+
 function addDays(n) {
   const d = new Date()
   d.setUTCHours(0, 0, 0, 0)
@@ -140,9 +168,54 @@ async function main() {
         { name: 'Nhà gỗ view thác', bed: '2 giường đôi', occ: 4, total: 2, price: 1900000, desc: 'Gia đình, nghe tiếng thác.' },
       ],
     },
+    {
+      propertyCode: 'HS011', name: 'Biển Xanh Vũng Tàu', slug: 'bien-xanh-vung-tau',
+      address: 'Bãi Sau, Vũng Tàu', basePrice: 1050000, thumb: 'photo-1507525428034-b723cf961d3e',
+      desc: 'Căn hộ view biển Bãi Sau, hồ bơi vô cực, gần phố hải sản.',
+      rooms: [
+        { name: 'Phòng hướng biển', bed: '1 giường lớn', occ: 2, total: 6, price: 1050000, desc: 'Ban công nhìn ra biển, đón bình minh.' },
+        { name: 'Căn hộ 2 phòng ngủ', bed: '2 giường lớn', occ: 4, total: 3, price: 1950000, desc: 'Rộng rãi cho nhóm/gia đình.' },
+      ],
+    },
+    {
+      propertyCode: 'HS012', name: 'Tuyền Lâm Lake House', slug: 'tuyen-lam-lake-house',
+      address: 'Hồ Tuyền Lâm, Đà Lạt', basePrice: 1300000, thumb: 'photo-1589820296156-2454bb8a6ad1',
+      desc: 'Nhà gỗ bên hồ Tuyền Lâm, sương mù lãng mạn, chèo SUP buổi sáng.',
+      rooms: [
+        { name: 'Cabin ven hồ', bed: '1 giường đôi', occ: 2, total: 5, price: 1300000, desc: 'View hồ, lò sưởi.' },
+        { name: 'Villa gỗ 2 phòng', bed: '2 giường đôi', occ: 4, total: 2, price: 2400000, desc: 'Bếp riêng, hiên ngắm hồ.' },
+      ],
+    },
+    {
+      propertyCode: 'HS013', name: 'Hạ Long Bay Bungalow', slug: 'ha-long-bay-bungalow',
+      address: 'Hạ Long, Quảng Ninh', basePrice: 1500000, thumb: 'photo-1582719478250-c89cae4dc85b',
+      desc: 'Bungalow nhìn ra vịnh Hạ Long, gần cảng tàu tham quan.',
+      rooms: [
+        { name: 'Phòng view vịnh', bed: '1 giường lớn', occ: 2, total: 6, price: 1500000, desc: 'Nhìn thẳng ra vịnh di sản.' },
+        { name: 'Suite gia đình', bed: '2 giường lớn', occ: 4, total: 2, price: 2700000, desc: 'Phòng khách riêng, bồn tắm.' },
+      ],
+    },
+    {
+      propertyCode: 'HS014', name: 'Nhà Vườn Cà Phê Buôn Ma Thuột', slug: 'nha-vuon-ca-phe-buon-ma-thuot',
+      address: 'Buôn Ma Thuột, Đắk Lắk', basePrice: 600000, thumb: 'photo-1501785888041-af3ef285b470',
+      desc: 'Homestay giữa vườn cà phê, trải nghiệm rang xay và cưỡi voi.',
+      rooms: [
+        { name: 'Phòng nhà dài Ê-đê', bed: '2 giường đơn', occ: 2, total: 5, price: 600000, desc: 'Đậm bản sắc Tây Nguyên.' },
+        { name: 'Bungalow vườn', bed: '1 giường đôi', occ: 2, total: 3, price: 1000000, desc: 'Yên tĩnh giữa vườn cà phê.' },
+      ],
+    },
+    {
+      propertyCode: 'HS015', name: 'Mây Núi Cấm An Giang', slug: 'may-nui-cam-an-giang',
+      address: 'Núi Cấm, An Giang', basePrice: 550000, thumb: 'photo-1535139262971-c51845709a48',
+      desc: 'Homestay trên Núi Cấm, săn mây miền Tây, ngắm đồng lúa Bảy Núi.',
+      rooms: [
+        { name: 'Phòng tập thể', bed: '4 giường đơn', occ: 4, total: 4, price: 550000, desc: 'Phù hợp nhóm bạn trẻ.' },
+        { name: 'Phòng đôi view núi', bed: '1 giường đôi', occ: 2, total: 3, price: 900000, desc: 'Ban công ngắm bình minh trên mây.' },
+      ],
+    },
   ]
 
-  for (const h of homestays) {
+  for (const [hi, h] of homestays.entries()) {
     const prop = await prisma.property.create({
       data: {
         propertyCode: h.propertyCode, name: h.name, slug: h.slug, propertyType: 'HOMESTAY',
@@ -150,14 +223,18 @@ async function main() {
         checkInTime: '14:00', checkOutTime: '12:00', basePrice: h.basePrice, depositRate: 30,
         cancellationPolicyId: policy.id, avgRating: 4.6, reviewCount: 12,
         status: 'VISIBLE', thumbnail: img(h.thumb), isFeatured: true,
+        // Thư viện 5 ảnh cho trang chi tiết.
+        images: { create: gallery(h.thumb, hi + 1, 5) },
       },
     })
-    for (const r of h.rooms) {
+    for (const [ri, r] of h.rooms.entries()) {
       const rt = await prisma.roomType.create({
         data: {
           propertyId: prop.id, name: r.name, bedType: r.bed, maxOccupancy: r.occ,
           totalRooms: r.total, breakfastIncluded: true, basePricePerNight: r.price, description: r.desc,
           roomSize: 28,
+          // 3 ảnh cho mỗi loại phòng.
+          images: { create: gallery(h.thumb, hi + ri + 2, 3) },
         },
       })
       // Mở lịch tồn phòng 120 ngày tới.
@@ -221,15 +298,42 @@ async function main() {
       days: 2, nights: 1, basePrice: 1500000, dest: 'Cần Thơ', from: 'TP. Hồ Chí Minh',
       thumb: 'photo-1528127269322-539801943592', desc: 'Chợ nổi Cái Răng, vườn trái cây, lò hủ tiếu và đờn ca tài tử.',
     },
+    {
+      tourCode: 'TR011', title: 'Đà Lạt – Thành phố ngàn hoa 3N2Đ', slug: 'da-lat-thanh-pho-ngan-hoa-3n2d',
+      days: 3, nights: 2, basePrice: 2400000, dest: 'Đà Lạt, Lâm Đồng', from: 'TP. Hồ Chí Minh',
+      thumb: 'photo-1589820296156-2454bb8a6ad1', desc: 'Đồi chè Cầu Đất, Langbiang, thác Datanla và chợ đêm Đà Lạt.',
+    },
+    {
+      tourCode: 'TR012', title: 'Sa Pa – Chinh phục Fansipan 2N1Đ', slug: 'sa-pa-chinh-phuc-fansipan-2n1d',
+      days: 2, nights: 1, basePrice: 2100000, dest: 'Sa Pa, Lào Cai', from: 'Hà Nội',
+      thumb: 'photo-1501785888041-af3ef285b470', desc: 'Cáp treo Fansipan, bản Cát Cát, ruộng bậc thang và chợ vùng cao.',
+    },
+    {
+      tourCode: 'TR013', title: 'Côn Đảo – Hành trình tâm linh 3N2Đ', slug: 'con-dao-hanh-trinh-tam-linh-3n2d',
+      days: 3, nights: 2, basePrice: 4200000, dest: 'Côn Đảo, Bà Rịa – Vũng Tàu', from: 'TP. Hồ Chí Minh',
+      thumb: 'photo-1507525428034-b723cf961d3e', desc: 'Viếng nghĩa trang Hàng Dương, lặn ngắm san hô và bãi Đầm Trầu.',
+    },
+    {
+      tourCode: 'TR014', title: 'Quy Nhơn – Phú Yên biển xanh 3N2Đ', slug: 'quy-nhon-phu-yen-bien-xanh-3n2d',
+      days: 3, nights: 2, basePrice: 2950000, dest: 'Quy Nhơn – Phú Yên', from: 'TP. Hồ Chí Minh',
+      thumb: 'photo-1519046904884-53103b34b206', desc: 'Kỳ Co, Eo Gió, Gành Đá Đĩa và đầm Ô Loan thơ mộng.',
+    },
+    {
+      tourCode: 'TR015', title: 'Hạ Long – Du thuyền vịnh Lan Hạ 2N1Đ', slug: 'ha-long-du-thuyen-lan-ha-2n1d',
+      days: 2, nights: 1, basePrice: 3600000, dest: 'Hạ Long – Lan Hạ', from: 'Hà Nội',
+      thumb: 'photo-1582719478250-c89cae4dc85b', desc: 'Ngủ đêm trên du thuyền, chèo kayak hang Luồn, tắm biển đảo Ti Tốp.',
+    },
   ]
 
-  for (const t of tours) {
+  for (const [ti, t] of tours.entries()) {
     const tour = await prisma.tour.create({
       data: {
         tourCode: t.tourCode, title: t.title, slug: t.slug, shortDescription: t.desc, description: t.desc,
         durationDays: t.days, durationNights: t.nights, departurePoint: t.from, destination: t.dest,
         minPax: 1, maxPax: 25, basePrice: t.basePrice, depositRate: 30, cancellationPolicyId: policy.id,
         avgRating: 4.7, reviewCount: 20, status: 'VISIBLE', thumbnail: img(t.thumb), isFeatured: true,
+        // Thư viện 5 ảnh cho trang chi tiết tour.
+        images: { create: gallery(t.thumb, ti + 2, 5) },
       },
     })
     // 3 chuyến khởi hành sắp tới.
