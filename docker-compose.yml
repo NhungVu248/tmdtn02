@@ -3,7 +3,8 @@
 # Chạy tất cả bằng 1 lệnh:  docker compose up -d --build
 # Web khách     : http://localhost:8080
 # Khu vực admin : http://localhost:8080/admin   (admin / Admin@123456)
-# API           : http://localhost:4000
+# API           : nội bộ, truy cập qua http://localhost:8080/api
+#                 (nginx chuyển tiếp — không cần mở cổng 4000 ra ngoài)
 # ===================================================================
 services:
   db:
@@ -31,14 +32,17 @@ services:
       ADMIN_JWT_EXPIRES_IN: "8h"
       PORT: "4000"
       CLIENT_URL: "http://localhost:8080"
-      BACKEND_URL: "http://localhost:4000"
+      # Trình duyệt truy cập API/ảnh qua cổng web 8080 (nginx chuyển tiếp).
+      BACKEND_URL: "http://localhost:8080"
       SEED_ADMIN_USERNAME: "admin"
       SEED_ADMIN_PASSWORD: "Admin@123456"
     depends_on:
       db:
         condition: service_healthy
-    ports:
-      - "4000:4000"
+    # Không mở cổng 4000 ra máy host nữa — backend chỉ dùng nội bộ (service "backend").
+    # (Muốn gọi API trực tiếp khi phát triển thì tự thêm lại: ports: ["4000:4000"].)
+    expose:
+      - "4000"
     volumes:
       - uploads_data:/app/uploads
     restart: unless-stopped
@@ -47,9 +51,9 @@ services:
     build:
       context: ./frontend
       args:
-        # URL API mà trình duyệt gọi tới. Khi deploy lên VPS/domain, đổi thành
-        # địa chỉ API công khai (vd http://<IP-hoặc-domain>:4000).
-        VITE_API_URL: "http://localhost:4000"
+        # Để trống = trình duyệt gọi API cùng origin (http://localhost:8080/api),
+        # nginx chuyển tiếp sang backend. Nhờ vậy không phụ thuộc cổng 4000.
+        VITE_API_URL: ""
     depends_on:
       - backend
     ports:

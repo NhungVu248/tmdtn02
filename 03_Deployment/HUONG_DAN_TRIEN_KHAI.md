@@ -36,7 +36,11 @@ tài khoản admin → chạy API và web.
 |-------------------|----------------------------------|
 | Web khách         | http://localhost:8080            |
 | Khu vực quản trị  | http://localhost:8080/admin      |
-| API (back-end)    | http://localhost:4000/api/health |
+| API (back-end)    | http://localhost:8080/api/health |
+
+> API đi qua chính cổng web 8080 (nginx chuyển tiếp `/api` và `/uploads` sang
+> backend nội bộ). **Không cần mở cổng 4000** — nhờ vậy tránh được lỗi trùng cổng
+> 4000 trên Windows/Docker Desktop.
 
 **Tài khoản quản trị mặc định:** `admin` / `Admin@123456`
 Khách hàng tự đăng ký tại `/register`, hoặc đặt với tư cách khách (guest).
@@ -65,15 +69,15 @@ Các biến đã đặt sẵn trong `docker-compose.yml`. **Khi deploy thật, h
 | `ADMIN_JWT_SECRET`   | Khoá ký token quản trị (tách riêng)       | Chuỗi ngẫu nhiên khác                    |
 | `SEED_ADMIN_PASSWORD`| Mật khẩu admin tạo lần đầu                | Đổi mật khẩu mạnh                        |
 | `CLIENT_URL`         | Origin của web (CORS)                     | http://localhost:8080 hoặc domain thật   |
-| `BACKEND_URL`        | Dùng để tạo URL ảnh tải lên               | Trùng địa chỉ API công khai              |
-| `VITE_API_URL` (build arg của frontend) | URL API mà trình duyệt gọi | Địa chỉ API công khai (vd http://IP:4000)|
+| `BACKEND_URL`        | Dùng để tạo URL ảnh tải lên               | Trùng địa chỉ web công khai (qua :8080)  |
+| `VITE_API_URL` (build arg của frontend) | URL API mà trình duyệt gọi | Để trống = cùng origin với web (khuyên dùng) |
 
 ### Triển khai lên VPS có IP/tên miền
-1. Mở cổng 8080 (web) và 4000 (API) trên VPS/tường lửa.
+1. Chỉ cần mở **cổng 8080** (web) trên VPS/tường lửa — API đi chung cổng này.
 2. Sửa trong `docker-compose.yml`:
-   - `frontend.build.args.VITE_API_URL` → `http://<IP-hoặc-domain>:4000`
-   - `backend.environment.BACKEND_URL` → `http://<IP-hoặc-domain>:4000`
    - `backend.environment.CLIENT_URL` → `http://<IP-hoặc-domain>:8080`
+   - `backend.environment.BACKEND_URL` → `http://<IP-hoặc-domain>:8080`
+   - `frontend.build.args.VITE_API_URL` → để trống `""` (web gọi API cùng origin).
 3. Chạy lại: `docker compose up -d --build`.
 
 ### Tuỳ chọn (không bắt buộc để demo)

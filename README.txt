@@ -31,7 +31,11 @@ Thanh toán: VNPAY (môi trường sandbox) + COD
 -------------------------------------------------------------------------------
 3. ĐỊA CHỈ TRIỂN KHAI THỬ
 -------------------------------------------------------------------------------
-- Chạy nội bộ (local):
+- Chạy bằng Docker (khuyên dùng khi demo) — mọi thứ qua 1 cổng 8080:
+    Web khách              : http://localhost:8080
+    Khu vực quản trị (admin): http://localhost:8080/admin
+    API                    : http://localhost:8080/api  (nginx chuyển tiếp, không cần cổng 4000)
+- Chạy chế độ phát triển (npm run dev, không Docker):
     Front-end (web khách)  : http://localhost:5173
     Khu vực quản trị (admin): http://localhost:5173/admin
     Back-end API           : http://localhost:4000
