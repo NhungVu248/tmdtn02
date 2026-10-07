@@ -61,6 +61,8 @@ async function orderDetail(b) {
     guestName: b.guestName,
     guestEmail: b.guestEmail,
     guestPhone: b.guestPhone,
+    note: b.note, // UC-09: ghi chú / yêu cầu đặc biệt của khách
+
     discountCode: b.discountCode,
     discountAmount: b.discountAmount,
     paymentMethod: b.paymentMethod,
