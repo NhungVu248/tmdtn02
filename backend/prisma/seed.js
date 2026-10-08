@@ -323,6 +323,56 @@ async function main() {
       days: 2, nights: 1, basePrice: 3600000, dest: 'Hạ Long – Lan Hạ', from: 'Hà Nội',
       thumb: 'photo-1582719478250-c89cae4dc85b', desc: 'Ngủ đêm trên du thuyền, chèo kayak hang Luồn, tắm biển đảo Ti Tốp.',
     },
+    {
+      tourCode: 'TR016', title: 'Mù Cang Chải – Mùa vàng ruộng bậc thang 2N1Đ', slug: 'mu-cang-chai-mua-vang-2n1d',
+      days: 2, nights: 1, basePrice: 1750000, dest: 'Mù Cang Chải, Yên Bái', from: 'Hà Nội',
+      thumb: 'photo-1528127269322-539801943592', desc: 'Đồi Mâm Xôi, đèo Khau Phạ và mùa lúa chín vàng rực Tây Bắc.',
+    },
+    {
+      tourCode: 'TR017', title: 'Cao Bằng – Thác Bản Giốc & hang Pác Bó 3N2Đ', slug: 'cao-bang-ban-gioc-pac-bo-3n2d',
+      days: 3, nights: 2, basePrice: 3100000, dest: 'Cao Bằng', from: 'Hà Nội',
+      thumb: 'photo-1464822759023-fed622ff2c3b', desc: 'Thác Bản Giốc hùng vĩ, động Ngườm Ngao, suối Lê Nin – hang Pác Bó.',
+    },
+    {
+      tourCode: 'TR018', title: 'Đà Nẵng – Bà Nà Hills – Hội An 3N2Đ', slug: 'da-nang-ba-na-hoi-an-3n2d',
+      days: 3, nights: 2, basePrice: 2650000, dest: 'Đà Nẵng – Hội An', from: 'Hà Nội',
+      thumb: 'photo-1559592413-7cec4d0cae2b', desc: 'Cầu Vàng Bà Nà, bán đảo Sơn Trà, phố cổ Hội An lung linh đèn lồng.',
+    },
+    {
+      tourCode: 'TR019', title: 'Tây Nguyên – Pleiku & Buôn Ma Thuột 3N2Đ', slug: 'tay-nguyen-pleiku-bmt-3n2d',
+      days: 3, nights: 2, basePrice: 2550000, dest: 'Gia Lai – Đắk Lắk', from: 'TP. Hồ Chí Minh',
+      thumb: 'photo-1501785888041-af3ef285b470', desc: 'Biển Hồ Pleiku, thác Dray Nur, vườn cà phê và văn hóa cồng chiêng.',
+    },
+    {
+      tourCode: 'TR020', title: 'Măng Đen – Đà Lạt thu nhỏ 2N1Đ', slug: 'mang-den-2n1d',
+      days: 2, nights: 1, basePrice: 1600000, dest: 'Măng Đen, Kon Tum', from: 'Đà Nẵng',
+      thumb: 'photo-1618773928121-c32242e63f39', desc: 'Rừng thông Măng Đen, thác Pa Sỹ, hồ Đắk Ke và chùa Khánh Lâm.',
+    },
+    {
+      tourCode: 'TR021', title: 'Đảo Nam Du – Thiên đường hoang sơ 3N2Đ', slug: 'dao-nam-du-3n2d',
+      days: 3, nights: 2, basePrice: 2900000, dest: 'Nam Du, Kiên Giang', from: 'TP. Hồ Chí Minh',
+      thumb: 'photo-1507525428034-b723cf961d3e', desc: 'Lặn ngắm san hô, câu cá, bãi Mến hoang sơ và hải sản tươi rói.',
+    },
+    {
+      tourCode: 'TR022', title: 'Hà Nội – City Tour & Foodtour 1 ngày', slug: 'ha-noi-city-foodtour-1-ngay',
+      days: 1, nights: 0, basePrice: 750000, dest: 'Hà Nội', from: 'Hà Nội',
+      thumb: 'photo-1559592413-7cec4d0cae2b', desc: 'Văn Miếu, Hồ Gươm, phố cổ và thưởng thức đặc sản ẩm thực Hà thành.',
+    },
+    {
+      tourCode: 'TR023', title: 'Ninh Bình – Tam Chúc – Chùa Hương 2N1Đ', slug: 'ninh-binh-tam-chuc-chua-huong-2n1d',
+      days: 2, nights: 1, basePrice: 1450000, dest: 'Ninh Bình – Hà Nam', from: 'Hà Nội',
+      thumb: 'photo-1566073771259-6a8506099945', desc: 'Chùa Tam Chúc lớn nhất thế giới, Tràng An và hành hương chùa Hương.',
+    },
+    {
+      tourCode: 'TR024', title: 'Phong Nha – Kẻ Bàng khám phá hang động 2N1Đ', slug: 'phong-nha-ke-bang-2n1d',
+      days: 2, nights: 1, basePrice: 2350000, dest: 'Quảng Bình', from: 'Đà Nẵng',
+      thumb: 'photo-1535139262971-c51845709a48', desc: 'Động Phong Nha, động Thiên Đường và sông Chày – Hang Tối mạo hiểm.',
+    },
+    {
+      tourCode: 'TR025', title: 'Đảo Bình Ba – Đảo tôm hùm 2N1Đ', slug: 'dao-binh-ba-2n1d',
+      days: 2, nights: 1, basePrice: 1850000, dest: 'Bình Ba, Khánh Hòa', from: 'TP. Hồ Chí Minh',
+      thumb: 'photo-1519046904884-53103b34b206', desc: 'Lặn biển ngắm san hô, bãi Chướng – bãi Nồm và thưởng thức tôm hùm.',
+    },
   ]
 
   for (const [ti, t] of tours.entries()) {
