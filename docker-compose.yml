@@ -78,6 +78,17 @@ services:
       - "8443:443"  # HTTPS (truy cập chính)
     restart: unless-stopped
 
+  # Cửa công khai: tạo link Internet (https://*.trycloudflare.com) để mọi người quét QR vào được,
+  # kể cả 4G/khác mạng. Chạy chung trong Docker nên chỉ cần "docker compose up".
+  # URL ngẫu nhiên, xem bằng:  docker compose logs tunnel | grep trycloudflare
+  # Lấy URL đó đặt vào PUBLIC_URL ở .env rồi "docker compose up -d" lại để VNPAY/redirect đúng.
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    command: tunnel --no-autoupdate --url https://frontend:443 --no-tls-verify
+    depends_on:
+      - frontend
+    restart: unless-stopped
+
 volumes:
   db_data:
   uploads_data:
