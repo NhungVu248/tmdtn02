@@ -132,6 +132,10 @@ export async function checkTourAvailability(req, res, next) {
     if (!departure || departure.status === 'CLOSED' || departure.status === 'CANCELLED') {
       return res.json({ type: 'TOUR', available: false, slotsLeft: 0, tentativePrice: null, message: 'Không có chuyến khởi hành phù hợp' })
     }
+    // Chuyến đã qua ngày khởi hành -> không cho đặt.
+    if (new Date(departure.departureDate) < startOfToday()) {
+      return res.json({ type: 'TOUR', available: false, slotsLeft: 0, tentativePrice: null, message: 'Chuyến đã qua ngày khởi hành' })
+    }
 
     const slotsLeft = availableSlots(departure)
     const totalGuests = adults + children + infants // BR-31: hạ tầng ghế; infant có thể tính suất riêng

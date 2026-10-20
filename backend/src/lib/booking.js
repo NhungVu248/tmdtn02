@@ -18,6 +18,11 @@ export function parseUtcDate(str) {
   const d = new Date(str)
   return isNaN(d) ? null : new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()))
 }
+// Nửa đêm (UTC) của hôm nay — dùng để chặn đặt phòng/tour cho ngày đã qua.
+export function startOfToday() {
+  const n = new Date()
+  return new Date(Date.UTC(n.getUTCFullYear(), n.getUTCMonth(), n.getUTCDate()))
+}
 export function nightsBetween(from, to) {
   const a = parseUtcDate(from)
   const b = parseUtcDate(to)

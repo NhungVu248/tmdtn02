@@ -8,6 +8,7 @@ import {
   hashPin,
   nightsBetween,
   parseUtcDate,
+  startOfToday,
   releaseExpiredHomestayHolds,
   releaseExpiredTourHolds,
 } from '../lib/booking.js'
@@ -104,6 +105,10 @@ export async function createHomestayBooking(req, res, next) {
     const nights = nightsBetween(checkIn, checkOut)
     if (!nights || nights.length === 0) {
       return res.status(400).json({ message: 'Khoảng ngày không hợp lệ' })
+    }
+    // Chặn đặt cho ngày nhận phòng đã qua.
+    if (nights[0] < startOfToday()) {
+      return res.status(400).json({ message: 'Ngày nhận phòng đã qua. Vui lòng chọn ngày khác.', code: 'PAST_DATE' })
     }
 
     const property = await prisma.property.findUnique({ where: { slug }, include: { roomTypes: true } })
@@ -228,6 +233,10 @@ export async function createTourBooking(req, res, next) {
     const day = parseUtcDate(date)
     if (!day) {
       return res.status(400).json({ message: 'Ngày khởi hành không hợp lệ' })
+    }
+    // Chặn đặt chuyến đã qua ngày khởi hành.
+    if (day < startOfToday()) {
+      return res.status(400).json({ message: 'Ngày khởi hành đã qua. Vui lòng chọn ngày khác.', code: 'PAST_DATE' })
     }
 
     const tour = await prisma.tour.findUnique({ where: { slug } })
