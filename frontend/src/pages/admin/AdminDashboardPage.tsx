@@ -57,13 +57,6 @@ export function AdminDashboardPage() {
       {/* Lời chào */}
       <div className="rounded-2xl border border-slate-800 bg-gradient-to-r from-emerald-900/40 to-slate-900 p-6">
         <h2 className="text-2xl font-semibold text-white">Xin chào, {admin?.name || admin?.username} 👋</h2>
-        <p className="mt-1.5 text-slate-300">
-          Bạn đang đăng nhập với quyền{' '}
-          <span className="font-medium text-emerald-400">
-            {admin?.role === 'SUPER_ADMIN' ? 'Toàn quyền (Super Admin)' : 'Quản lý (Manager)'}
-          </span>
-          .
-        </p>
       </div>
 
       {/* ----- Báo cáo & biểu đồ ----- */}
