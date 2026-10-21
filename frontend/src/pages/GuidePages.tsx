@@ -162,6 +162,17 @@ export function GuideDetailPage() {
         {guide.publishedAt && <span>· {formatDate(guide.publishedAt)}</span>}
       </div>
 
+      {guide.serviceGroups && guide.serviceGroups.length > 0 && (
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <span className="text-sm text-forest-400">Nhóm dịch vụ liên quan:</span>
+          {guide.serviceGroups.map((g) => (
+            <span key={g.id} className="inline-flex items-center rounded-full border border-forest-200 bg-forest-50 px-3 py-1 text-xs font-medium text-forest-700">
+              🏷️ {g.name}
+            </span>
+          ))}
+        </div>
+      )}
+
       {guide.coverImage && (
         <img src={guide.coverImage} alt={guide.title} className="mt-6 aspect-[16/9] w-full rounded-3xl object-cover" />
       )}

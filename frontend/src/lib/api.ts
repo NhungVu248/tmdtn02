@@ -120,6 +120,7 @@ export interface GuideDetail extends GuideSummary {
     avgRating: number
     reviewCount: number
   }[]
+  serviceGroups?: { id: number; name: string; slug: string }[]
 }
 
 export interface Departure {

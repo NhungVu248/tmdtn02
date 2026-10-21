@@ -34,13 +34,15 @@ export async function getPublicGuide(req, res, next) {
             },
           },
         },
+        serviceGroups: { include: { group: { select: { id: true, name: true, slug: true } } } },
       },
     })
     if (!guide || guide.status !== 'VISIBLE') {
       return res.status(404).json({ message: 'Không tìm thấy bài cẩm nang' })
     }
     const relatedTours = guide.relatedTours.map((r) => r.tour).filter((t) => t && t.status === 'VISIBLE')
-    res.json({ guide: { ...guide, relatedTours } })
+    const serviceGroups = guide.serviceGroups.map((s) => s.group).filter(Boolean)
+    res.json({ guide: { ...guide, relatedTours, serviceGroups } })
   } catch (err) {
     next(err)
   }
