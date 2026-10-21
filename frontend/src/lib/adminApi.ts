@@ -618,6 +618,7 @@ export interface AdminReports {
   topTours: { productId: number; name?: string; slug?: string; bookingsCount: number; seats: number }[]
   homestayOccupancy: { productId: number; name?: string; slug?: string; totalRoomNights: number; bookedRoomNights: number; rate: number }[]
   revenueByGroup?: { id: number; name: string; amount: number }[]
+  revenueByType?: { type: 'TOUR' | 'HOMESTAY'; label: string; amount: number }[]
 }
 
 export interface ContactAttachment {

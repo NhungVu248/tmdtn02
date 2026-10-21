@@ -118,6 +118,12 @@ export async function getReports(req, res, next) {
       .filter((g) => g.amount > 0)
       .sort((a, b) => b.amount - a.amount)
 
+    // ----- Doanh thu theo LOẠI dịch vụ (Tour / Homestay) — cho biểu đồ tròn dashboard -----
+    const revenueByType = [
+      { type: 'TOUR', label: 'Tour', amount: [...tourRev.values()].reduce((s, v) => s + v, 0) },
+      { type: 'HOMESTAY', label: 'Homestay', amount: [...propRev.values()].reduce((s, v) => s + v, 0) },
+    ].filter((x) => x.amount > 0)
+
     // Tách thuế GTGT trên doanh thu thuần (giá đã gồm VAT).
     const cfg = await getSystemConfig()
     const net = grossRevenue - refundedAmount
@@ -131,6 +137,7 @@ export async function getReports(req, res, next) {
       topTours,
       homestayOccupancy,
       revenueByGroup,
+      revenueByType,
     })
   } catch (err) {
     next(err)
