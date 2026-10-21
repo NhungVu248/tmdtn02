@@ -1,4 +1,5 @@
-import { BrowserRouter, Route, Routes } from 'react-router-dom'
+import { useEffect } from 'react'
+import { BrowserRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { AuthProvider } from './lib/auth'
 import { AdminAuthProvider } from './lib/adminAuth'
 import { FavoritesProvider } from './lib/favorites'
@@ -55,12 +56,23 @@ import { TrackOrderPage } from './pages/TrackOrderPage'
 import { ReviewPage } from './pages/ReviewPage'
 import { NotFoundPage } from './pages/Placeholders'
 
+// Cuộn lên đầu trang mỗi khi đổi đường dẫn (nếu không, trang mới giữ nguyên vị trí
+// cuộn của trang trước — vào chi tiết tour/homestay lại hiển thị từ giữa trang).
+function ScrollToTop() {
+  const { pathname } = useLocation()
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
+  }, [pathname])
+  return null
+}
+
 function App() {
   return (
     <AuthProvider>
       <FavoritesProvider>
         <AdminAuthProvider>
           <BrowserRouter>
+            <ScrollToTop />
             <Routes>
         {/* Nhóm D – Khu vực quản trị (/admin), hoàn toàn tách biệt với website chính:
             provider, layout và guard riêng, không dùng chung với Route element={<Layout />} bên dưới. */}
