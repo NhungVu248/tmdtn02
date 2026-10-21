@@ -7,6 +7,8 @@ interface GoogleIdConfig {
 interface GoogleIdButtonOptions {
   theme?: 'outline' | 'filled_blue' | 'filled_black'
   size?: 'small' | 'medium' | 'large'
+  shape?: 'rectangular' | 'pill' | 'circle' | 'square'
+  logo_alignment?: 'left' | 'center'
   width?: number
   text?: 'signin_with' | 'signup_with' | 'continue_with' | 'signin'
   locale?: string

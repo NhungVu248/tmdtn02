@@ -64,12 +64,16 @@ export function GoogleSignInButton() {
             }
           },
         })
+        // Rộng khớp bề ngang form (tối đa 400px theo giới hạn GIS), bo tròn pill, logo canh trái.
+        const w = Math.min(400, Math.max(240, Math.floor(ref.current.offsetWidth) || 360))
         window.google!.accounts.id.renderButton(ref.current, {
           theme: 'outline',
           size: 'large',
-          width: 320,
+          shape: 'pill',
           text: 'continue_with',
           locale: 'vi',
+          logo_alignment: 'left',
+          width: w,
         })
       })
       .catch(() => setError('Không tải được Google Identity Services'))
@@ -81,9 +85,9 @@ export function GoogleSignInButton() {
   if (enabled === false) return null // Google chưa cấu hình -> ẩn nút
 
   return (
-    <div className="flex flex-col items-center">
-      <div ref={ref} />
-      {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
+    <div className="w-full">
+      <div ref={ref} className="flex w-full justify-center overflow-hidden" />
+      {error && <p className="mt-2 text-center text-sm text-red-600">{error}</p>}
     </div>
   )
 }
