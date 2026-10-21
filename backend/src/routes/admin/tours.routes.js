@@ -9,6 +9,7 @@ import {
   listTours,
   removeImage,
   setTourVisibility,
+  toursTimeline,
   tourCategories,
   updateDeparture,
   updateTour,
@@ -27,6 +28,8 @@ router.post('/uploads/image', uploadImage.single('file'), uploadFile)
 // Danh mục region/theme/duration + chính sách hủy cho form tour.
 router.get('/categories', tourCategories)
 router.post('/categories', createTourCategory)
+// Timeline lịch khởi hành — đặt trước /:id để không nhầm "timeline" thành id.
+router.get('/timeline', toursTimeline)
 
 router.get('/', listTours)
 router.post('/', createTour)

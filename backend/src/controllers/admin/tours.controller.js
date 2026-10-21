@@ -58,6 +58,38 @@ export async function listTours(req, res, next) {
   }
 }
 
+// UC-17 – Dữ liệu TIMELINE: mọi tour (đã công bố/ẩn) + các chuyến khởi hành trong khoảng ngày.
+// Dùng cho giao diện lịch khởi hành dạng timeline ở admin (hàng = tour, cột = ngày).
+export async function toursTimeline(req, res, next) {
+  try {
+    const from = parseUtcDate(req.query.from)
+    const to = parseUtcDate(req.query.to)
+    if (!from || !to) return res.status(400).json({ message: 'Thiếu khoảng ngày (from, to)' })
+    const tours = await prisma.tour.findMany({
+      where: { status: { in: ['VISIBLE', 'HIDDEN'] } }, // bỏ DRAFT (chưa có chuyến)
+      select: {
+        id: true,
+        title: true,
+        tourCode: true,
+        slug: true,
+        status: true,
+        durationDays: true,
+        thumbnail: true,
+        region: { select: { name: true } },
+        departures: {
+          where: { departureDate: { gte: from, lte: to } },
+          orderBy: { departureDate: 'asc' },
+          select: { id: true, departureDate: true, totalSlots: true, bookedSlots: true, heldSlots: true, status: true, guideName: true },
+        },
+      },
+      orderBy: { title: 'asc' },
+    })
+    res.json({ from, to, tours })
+  } catch (err) {
+    next(err)
+  }
+}
+
 // UC-17 – Chi tiết tour (đầy đủ để chỉnh sửa).
 export async function getTour(req, res, next) {
   try {

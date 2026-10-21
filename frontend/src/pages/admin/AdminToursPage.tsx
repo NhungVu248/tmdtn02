@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AdminApiError, adminApi, type AdminTour, type ServiceGroup } from '../../lib/adminApi'
+import { TourTimeline } from '../../components/admin/TourTimeline'
 
 const STATUS_LABEL: Record<string, string> = { DRAFT: 'Nháp (chờ công bố)', VISIBLE: 'Đang hiển thị', HIDDEN: 'Đã ẩn' }
 const STATUS_COLOR: Record<string, string> = { DRAFT: 'bg-amber-900 text-amber-300', VISIBLE: 'bg-emerald-900 text-emerald-300', HIDDEN: 'bg-slate-800 text-slate-400' }
 
 // UC-17 – Danh sách tour trong khu vực quản trị (mọi trạng thái).
 export function AdminToursPage() {
+  const [view, setView] = useState<'list' | 'timeline'>('list')
   const [items, setItems] = useState<AdminTour[]>([])
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState('')
@@ -56,6 +58,16 @@ export function AdminToursPage() {
         </Link>
       </div>
 
+      {/* Chuyển chế độ xem: bảng danh sách ↔ lịch khởi hành dạng timeline */}
+      <div className="mb-4 inline-flex rounded-lg border border-slate-800 bg-slate-900 p-0.5">
+        <button onClick={() => setView('list')} className={`rounded-md px-3 py-1.5 text-sm font-medium transition ${view === 'list' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-slate-200'}`}>Danh sách</button>
+        <button onClick={() => setView('timeline')} className={`rounded-md px-3 py-1.5 text-sm font-medium transition ${view === 'timeline' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-slate-200'}`}>🗓 Lịch khởi hành</button>
+      </div>
+
+      {view === 'timeline' ? (
+        <TourTimeline />
+      ) : (
+        <>
       <div className="mb-4 flex gap-3">
         <input
           value={search}
@@ -126,6 +138,8 @@ export function AdminToursPage() {
             </tbody>
           </table>
         </div>
+      )}
+        </>
       )}
     </div>
   )

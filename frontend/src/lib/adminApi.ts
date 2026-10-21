@@ -260,6 +260,9 @@ export const adminApi = {
     if (params.group) qs.set('group', String(params.group))
     return get<{ items: AdminTour[] }>(`/api/admin/tours?${qs.toString()}`)
   },
+  // Timeline lịch khởi hành: mọi tour + chuyến trong khoảng ngày [from, to] (YYYY-MM-DD).
+  toursTimeline: (from: string, to: string) =>
+    get<{ from: string; to: string; tours: TimelineTour[] }>(`/api/admin/tours/timeline?from=${from}&to=${to}`),
   getTour: (id: number) => get<{ tour: AdminTourDetail }>(`/api/admin/tours/${id}`),
   createTour: (data: Record<string, unknown>) => post<{ tour: AdminTourDetail }>('/api/admin/tours', data),
   updateTour: (id: number, data: Record<string, unknown>) => putReq<{ tour: AdminTourDetail }>(`/api/admin/tours/${id}`, data),
@@ -812,6 +815,27 @@ export interface AdminTourCat {
   id: number
   name: string
   kind: string | null
+}
+
+export interface TimelineDeparture {
+  id: number
+  departureDate: string
+  totalSlots: number
+  bookedSlots: number
+  heldSlots: number
+  status: 'OPEN' | 'CLOSED' | 'FULL' | 'CANCELLED'
+  guideName: string | null
+}
+export interface TimelineTour {
+  id: number
+  title: string
+  tourCode: string
+  slug: string
+  status: 'DRAFT' | 'VISIBLE' | 'HIDDEN'
+  durationDays: number
+  thumbnail: string | null
+  region?: { name: string } | null
+  departures: TimelineDeparture[]
 }
 
 export interface AdminTour {
