@@ -367,9 +367,40 @@ export async function removeImage(req, res, next) {
   try {
     const id = Number(req.params.id)
     const imageId = Number(req.params.imageId)
-    await prisma.tourImage.deleteMany({ where: { id: imageId, tourId: id } })
+    const img = await prisma.tourImage.findFirst({ where: { id: imageId, tourId: id } })
+    if (!img) return res.status(404).json({ message: 'Không tìm thấy ảnh' })
+    await prisma.tourImage.delete({ where: { id: imageId } })
+    // Xóa ảnh BÌA -> chọn ảnh còn lại làm bìa mới + cập nhật thumbnail.
+    if (img.isCover) {
+      const next = await prisma.tourImage.findFirst({ where: { tourId: id }, orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }] })
+      if (next) {
+        await prisma.tourImage.update({ where: { id: next.id }, data: { isCover: true } })
+        await prisma.tour.update({ where: { id }, data: { thumbnail: next.url } })
+      } else {
+        await prisma.tour.update({ where: { id }, data: { thumbnail: null } })
+      }
+    }
     await logAdminAction(req.admin.sub, 'tour.image.remove', { entityType: 'Tour', entityId: id, detail: { imageId } })
     res.json({ ok: true })
+  } catch (err) {
+    next(err)
+  }
+}
+
+// Đặt một ảnh làm BÌA của tour + đồng bộ thumbnail.
+export async function setCover(req, res, next) {
+  try {
+    const id = Number(req.params.id)
+    const imageId = Number(req.params.imageId)
+    const img = await prisma.tourImage.findFirst({ where: { id: imageId, tourId: id } })
+    if (!img) return res.status(404).json({ message: 'Không tìm thấy ảnh' })
+    await prisma.$transaction([
+      prisma.tourImage.updateMany({ where: { tourId: id, isCover: true }, data: { isCover: false } }),
+      prisma.tourImage.update({ where: { id: imageId }, data: { isCover: true } }),
+      prisma.tour.update({ where: { id }, data: { thumbnail: img.url } }),
+    ])
+    await logAdminAction(req.admin.sub, 'tour.image.cover', { entityType: 'Tour', entityId: id, detail: { imageId } })
+    res.json({ ok: true, coverId: imageId })
   } catch (err) {
     next(err)
   }

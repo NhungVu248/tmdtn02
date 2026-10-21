@@ -10,6 +10,7 @@ import {
   homestayMeta,
   listHomestays,
   removeImage,
+  setCover,
   setInventory,
   setVisibility,
   updateHomestay,
@@ -37,6 +38,7 @@ router.patch('/:id/visibility', setVisibility)
 
 router.post('/:id/images', addImage)
 router.delete('/:id/images/:imageId', removeImage)
+router.patch('/:id/images/:imageId/cover', setCover)
 
 // Loại phòng
 router.post('/:id/room-types', createRoomType)

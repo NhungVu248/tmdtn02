@@ -239,6 +239,8 @@ export const adminApi = {
     post<{ image: { id: number; url: string } }>(`/api/admin/homestays/${propertyId}/images`, { filename }),
   removeImage: (propertyId: number, imageId: number) =>
     del<{ ok: boolean }>(`/api/admin/homestays/${propertyId}/images/${imageId}`),
+  setCover: (propertyId: number, imageId: number) =>
+    patchReq<{ ok: boolean; coverId: number }>(`/api/admin/homestays/${propertyId}/images/${imageId}/cover`, {}),
   // Loại phòng
   createRoomType: (propertyId: number, data: Record<string, unknown>) =>
     post<{ roomType: AdminRoomType }>(`/api/admin/homestays/${propertyId}/room-types`, data),
@@ -296,6 +298,8 @@ export const adminApi = {
     post<{ image: TourImage }>(`/api/admin/tours/${tourId}/images`, { filename }),
   removeTourImage: (tourId: number, imageId: number) =>
     del<{ ok: boolean }>(`/api/admin/tours/${tourId}/images/${imageId}`),
+  setTourCover: (tourId: number, imageId: number) =>
+    patchReq<{ ok: boolean; coverId: number }>(`/api/admin/tours/${tourId}/images/${imageId}/cover`, {}),
   createDeparture: (tourId: number, data: { date: string; totalSlots: number; priceAdult?: number | null; priceChild?: number | null; priceInfant?: number | null; guideName?: string }) =>
     post<{ departure: Departure }>(`/api/admin/tours/${tourId}/departures`, data),
   updateDeparture: (

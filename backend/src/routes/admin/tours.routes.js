@@ -8,6 +8,7 @@ import {
   getTour,
   listTours,
   removeImage,
+  setCover,
   setTourVisibility,
   toursTimeline,
   tourCategories,
@@ -39,6 +40,7 @@ router.patch('/:id/visibility', setTourVisibility)
 
 router.post('/:id/images', addImage)
 router.delete('/:id/images/:imageId', removeImage)
+router.patch('/:id/images/:imageId/cover', setCover)
 
 router.post('/:id/departures', createDeparture)
 router.put('/:id/departures/:depId', updateDeparture)

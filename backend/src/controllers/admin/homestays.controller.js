@@ -285,9 +285,40 @@ export async function removeImage(req, res, next) {
   try {
     const id = Number(req.params.id)
     const imageId = Number(req.params.imageId)
-    await prisma.propertyImage.deleteMany({ where: { id: imageId, propertyId: id } })
+    const img = await prisma.propertyImage.findFirst({ where: { id: imageId, propertyId: id } })
+    if (!img) return res.status(404).json({ message: 'Không tìm thấy ảnh' })
+    await prisma.propertyImage.delete({ where: { id: imageId } })
+    // Nếu xóa đúng ảnh BÌA -> chọn ảnh còn lại (thứ tự nhỏ nhất) làm bìa mới + cập nhật thumbnail.
+    if (img.isCover) {
+      const next = await prisma.propertyImage.findFirst({ where: { propertyId: id }, orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }] })
+      if (next) {
+        await prisma.propertyImage.update({ where: { id: next.id }, data: { isCover: true } })
+        await prisma.property.update({ where: { id }, data: { thumbnail: next.url } })
+      } else {
+        await prisma.property.update({ where: { id }, data: { thumbnail: null } })
+      }
+    }
     await logAdminAction(req.admin.sub, 'property.image.remove', { entityType: 'Property', entityId: id, detail: { imageId } })
     res.json({ ok: true })
+  } catch (err) {
+    next(err)
+  }
+}
+
+// Đặt một ảnh làm BÌA (bỏ cờ bìa ở các ảnh khác) + đồng bộ thumbnail hiển thị.
+export async function setCover(req, res, next) {
+  try {
+    const id = Number(req.params.id)
+    const imageId = Number(req.params.imageId)
+    const img = await prisma.propertyImage.findFirst({ where: { id: imageId, propertyId: id } })
+    if (!img) return res.status(404).json({ message: 'Không tìm thấy ảnh' })
+    await prisma.$transaction([
+      prisma.propertyImage.updateMany({ where: { propertyId: id, isCover: true }, data: { isCover: false } }),
+      prisma.propertyImage.update({ where: { id: imageId }, data: { isCover: true } }),
+      prisma.property.update({ where: { id }, data: { thumbnail: img.url } }),
+    ])
+    await logAdminAction(req.admin.sub, 'property.image.cover', { entityType: 'Property', entityId: id, detail: { imageId } })
+    res.json({ ok: true, coverId: imageId })
   } catch (err) {
     next(err)
   }

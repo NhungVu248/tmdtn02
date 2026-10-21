@@ -160,8 +160,18 @@ export function AdminTourFormPage() {
 
   async function removeImage(imageId: number) {
     if (!tourId) return
-    await adminApi.removeTourImage(tourId, imageId)
-    setImages((prev) => prev.filter((im) => im.id !== imageId))
+    try {
+      await adminApi.removeTourImage(tourId, imageId)
+      // Refetch để cập nhật ảnh BÌA mới (backend tự gán khi xóa đúng ảnh bìa).
+      const { tour } = await adminApi.getTour(tourId); setImages(tour.images ?? [])
+    } catch (err) { setError(err instanceof AdminApiError ? err.message : 'Xóa ảnh thất bại') }
+  }
+  async function setCover(imageId: number) {
+    if (!tourId) return
+    try {
+      await adminApi.setTourCover(tourId, imageId)
+      const { tour } = await adminApi.getTour(tourId); setImages(tour.images ?? [])
+    } catch (err) { setError(err instanceof AdminApiError ? err.message : 'Đặt ảnh bìa thất bại') }
   }
 
   if (!loaded) return <p className="text-slate-500">Đang tải...</p>
@@ -237,10 +247,14 @@ export function AdminTourFormPage() {
             <label className={label}>Thư viện ảnh</label>
             <div className="flex flex-wrap gap-2">
               {images.map((im) => (
-                <div key={im.id} className="group relative h-20 w-28 overflow-hidden rounded-lg border border-slate-700">
+                <div key={im.id} className={`group relative h-20 w-28 overflow-hidden rounded-lg border ${im.isCover ? 'border-emerald-500' : 'border-slate-700'}`}>
                   <img src={im.url} alt="" className="h-full w-full object-cover" />
-                  {im.isCover && <span className="absolute left-1 top-1 rounded bg-emerald-600 px-1 text-[10px] text-white">Bìa</span>}
-                  <button type="button" onClick={() => removeImage(im.id)} className="absolute right-1 top-1 hidden rounded-full bg-black/70 px-1.5 text-xs text-white group-hover:block">✕</button>
+                  {im.isCover ? (
+                    <span className="absolute left-1 top-1 rounded bg-emerald-600 px-1 text-[10px] text-white">Bìa</span>
+                  ) : (
+                    <button type="button" onClick={() => setCover(im.id)} className="absolute inset-x-1 bottom-1 hidden rounded bg-emerald-600/90 py-0.5 text-[10px] font-medium text-white hover:bg-emerald-600 group-hover:block">Đặt làm bìa</button>
+                  )}
+                  <button type="button" onClick={() => removeImage(im.id)} className="absolute right-1 top-1 hidden rounded-full bg-black/70 px-1.5 text-xs text-white group-hover:block" title="Xóa ảnh">✕</button>
                 </div>
               ))}
               <label className="flex h-20 w-28 cursor-pointer items-center justify-center rounded-lg border border-dashed border-slate-700 text-xs text-slate-500 hover:border-emerald-500">
