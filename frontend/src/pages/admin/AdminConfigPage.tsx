@@ -118,11 +118,6 @@ function ConfigTab({ isSuperAdmin }: { isSuperAdmin: boolean }) {
       {info && <div className="rounded-lg border border-emerald-800 bg-emerald-950/40 px-4 py-2 text-sm text-emerald-300">{info}</div>}
       {error && <div className="rounded-lg border border-red-800 bg-red-950/40 px-4 py-2 text-sm text-red-300">⚠️ {error}</div>}
 
-      <div className="rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-slate-400">
-        Tỷ lệ cọc, phí hủy theo ngày, thuế VAT và phương thức thanh toán đã chuyển sang trang <a href="/admin/payments" className="text-emerald-400 hover:underline">Phương thức thanh toán &amp; phí</a>.
-      </div>
-
-
       <section className="rounded-xl border border-slate-800 bg-slate-950 p-5">
         <h2 className="mb-3 font-semibold text-slate-200">Thông tin người bán</h2>
         <div className="grid grid-cols-2 gap-3">
