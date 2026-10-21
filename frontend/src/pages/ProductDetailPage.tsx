@@ -95,8 +95,10 @@ export function ProductDetailPage() {
     )
   }
 
-  const cover = property.images.find((i) => i.isCover)?.url || property.images[0]?.url || property.thumbnail
-  const gallery = property.images.slice(0, 5)
+  // Ảnh bìa + 4 ảnh phụ KHÁC bìa (tránh lặp ảnh bìa xuống lưới khi bìa không ở vị trí đầu).
+  const coverImg = property.images.find((i) => i.isCover) ?? property.images[0]
+  const cover = coverImg?.url || property.thumbnail
+  const gallery = property.images.filter((i) => i.id !== coverImg?.id).slice(0, 4)
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-6">
@@ -109,7 +111,7 @@ export function ProductDetailPage() {
           {cover && <img src={cover} alt={property.name} className="h-full w-full object-cover" />}
           <FavoriteButton productId={property.id} className="absolute right-3 top-3" />
         </div>
-        {gallery.slice(1, 5).map((img) => (
+        {gallery.map((img) => (
           <div key={img.id} className="hidden aspect-[4/3] bg-slate-100 sm:block">
             <img src={img.url} alt={img.caption || ''} className="h-full w-full object-cover" />
           </div>

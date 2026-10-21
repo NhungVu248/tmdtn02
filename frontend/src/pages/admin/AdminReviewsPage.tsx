@@ -269,16 +269,22 @@ export function AdminReviewsPage() {
                 </div>
               ) : null}
 
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 {replyOpen !== r.id && (
-                  <button
-                    disabled={!r.reviewer?.email}
-                    onClick={() => openReply(r)}
-                    title={r.reviewer?.email ? '' : 'Đánh giá này không có email khách hàng'}
-                    className="rounded-lg border border-emerald-800 px-3 py-1.5 text-sm text-emerald-300 hover:bg-emerald-950/40 disabled:opacity-40"
-                  >
-                    {r.replyText ? '✉ Phản hồi lại' : '✉ Phản hồi khách'}
-                  </button>
+                  r.reviewer?.email ? (
+                    <button
+                      onClick={() => openReply(r)}
+                      className="rounded-lg border border-emerald-800 px-3 py-1.5 text-sm text-emerald-300 hover:bg-emerald-950/40"
+                    >
+                      {r.replyText ? '✉ Phản hồi lại' : '✉ Phản hồi khách'}
+                    </button>
+                  ) : (
+                    // Đánh giá không gắn đơn hàng có email (vd. đánh giá cũ/khách vãng lai không để lại email)
+                    // nên không thể gửi phản hồi qua email — hiển thị ghi chú rõ ràng thay cho nút mờ.
+                    <span className="inline-flex items-center gap-1 rounded-lg border border-slate-800 bg-slate-900 px-3 py-1.5 text-xs text-slate-500">
+                      ✉ Không có email để phản hồi
+                    </span>
+                  )
                 )}
                 {!r.approved && (
                   <button
