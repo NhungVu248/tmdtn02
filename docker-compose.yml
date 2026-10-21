@@ -67,6 +67,8 @@ services:
         # Để trống = trình duyệt gọi API cùng origin (nginx chuyển tiếp sang backend).
         # Nhờ vậy không phụ thuộc cổng 4000 và chạy được trên mọi host.
         VITE_API_URL: ""
+        # Google OAuth Client ID (đặt ở .env gốc). Để trống -> nút Google tự ẩn.
+        VITE_GOOGLE_CLIENT_ID: "${VITE_GOOGLE_CLIENT_ID:-}"
         # Tên/IP hợp lệ trên chứng chỉ tự ký. Mặc định localhost; thêm IP LAN qua .env
         # gốc để trình duyệt máy khác chấp nhận, vd:
         #   SSL_SAN=DNS:localhost,IP:127.0.0.1,IP:192.168.1.50
@@ -78,13 +80,14 @@ services:
       - "8443:443"  # HTTPS (truy cập chính)
     restart: unless-stopped
 
-  # Cửa công khai: tạo link Internet (https://*.trycloudflare.com) để mọi người quét QR vào được,
-  # kể cả 4G/khác mạng. Chạy chung trong Docker nên chỉ cần "docker compose up".
-  # URL ngẫu nhiên, xem bằng:  docker compose logs tunnel | grep trycloudflare
-  # Lấy URL đó đặt vào PUBLIC_URL ở .env rồi "docker compose up -d" lại để VNPAY/redirect đúng.
+  # Cửa công khai qua ngrok với TÊN MIỀN CỐ ĐỊNH (ngrok-free.dev) — URL KHÔNG đổi,
+  # dùng được cho Google OAuth + QR cố định. Đặt NGROK_AUTHTOKEN và PUBLIC_URL(domain) ở .env gốc.
+  # Trỏ vào http://frontend:80 (nginx phục vụ trực tiếp; ngrok tự cấp HTTPS công khai).
   tunnel:
-    image: cloudflare/cloudflared:latest
-    command: tunnel --no-autoupdate --url https://frontend:443 --no-tls-verify
+    image: ngrok/ngrok:latest
+    command: http http://frontend:80 --domain=${NGROK_DOMAIN}
+    environment:
+      NGROK_AUTHTOKEN: "${NGROK_AUTHTOKEN}"
     depends_on:
       - frontend
     restart: unless-stopped

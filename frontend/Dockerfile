@@ -5,6 +5,9 @@ WORKDIR /app
 # URL API được nhúng vào bản build (client gọi trực tiếp). Mặc định cho demo local.
 ARG VITE_API_URL=http://localhost:4000
 ENV VITE_API_URL=$VITE_API_URL
+# Google OAuth Client ID — để trống thì nút đăng nhập/đăng ký Google tự ẩn.
+ARG VITE_GOOGLE_CLIENT_ID=""
+ENV VITE_GOOGLE_CLIENT_ID=$VITE_GOOGLE_CLIENT_ID
 
 COPY package*.json ./
 RUN npm ci
