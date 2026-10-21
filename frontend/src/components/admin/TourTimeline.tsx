@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { adminApi, type TimelineDeparture, type TimelineTour } from '../../lib/adminApi'
+import { adminApi, type ServiceGroup, type TimelineDeparture, type TimelineTour } from '../../lib/adminApi'
 
 // Giao diện LỊCH KHỞI HÀNH dạng timeline (hàng = tour, cột = ngày). Dữ liệu thật từ
 // /api/admin/tours/timeline — KHÔNG tạo dữ liệu giả. Mỗi chuyến vẽ thành 1 thanh kéo dài
@@ -46,25 +46,46 @@ export function TourTimeline() {
   const [tours, setTours] = useState<TimelineTour[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  // Lọc & sắp xếp
+  const [code, setCode] = useState('') // lọc theo mã tour
+  const [group, setGroup] = useState('') // lọc theo nhóm dịch vụ
+  const [sort, setSort] = useState<'date' | 'price' | 'name'>('date')
+  const [groups, setGroups] = useState<ServiceGroup[]>([])
 
   const days = useMemo(() => Array.from({ length: DAYS }, (_, i) => addDays(anchor, i)), [anchor])
   const from = iso(days[0])
   const to = iso(days[DAYS - 1])
   const todayStr = iso(startOfTodayUTC())
 
+  useEffect(() => {
+    adminApi.listServiceGroups().then((r) => setGroups(r.flat)).catch(() => setGroups([]))
+  }, [])
+
   const load = useCallback(() => {
     setLoading(true)
     setError(null)
     adminApi
-      .toursTimeline(from, to)
+      .toursTimeline(from, to, { code: code.trim() || undefined, group: group ? Number(group) : undefined })
       .then((r) => setTours(r.tours))
       .catch(() => setError('Không tải được lịch khởi hành'))
       .finally(() => setLoading(false))
-  }, [from, to])
+  }, [from, to, code, group])
 
+  // Gọi lại khi đổi khung ngày/mã/nhóm (trễ nhẹ cho ô mã tour để không gọi liên tục).
   useEffect(() => {
-    load()
-  }, [load])
+    const t = setTimeout(load, code ? 350 : 0)
+    return () => clearTimeout(t)
+  }, [load, code])
+
+  // Sắp xếp phía client theo lựa chọn.
+  const sortedTours = useMemo(() => {
+    const firstDep = (t: TimelineTour) => (t.departures.length ? new Date(t.departures[0].departureDate).getTime() : Infinity)
+    const arr = [...tours]
+    if (sort === 'name') arr.sort((a, b) => a.title.localeCompare(b.title, 'vi'))
+    else if (sort === 'price') arr.sort((a, b) => a.basePrice - b.basePrice)
+    else arr.sort((a, b) => firstDep(a) - firstDep(b) || a.title.localeCompare(b.title, 'vi'))
+    return arr
+  }, [tours, sort])
 
   const cols = `180px repeat(${DAYS}, minmax(44px, 1fr))`
   const totalDepartures = tours.reduce((s, t) => s + t.departures.length, 0)
@@ -89,12 +110,34 @@ export function TourTimeline() {
         </div>
       </div>
 
+      {/* Thanh lọc theo mã tour + nhóm dịch vụ + sắp xếp */}
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <input
+          value={code}
+          onChange={(e) => setCode(e.target.value)}
+          placeholder="🔎 Lọc theo mã tour…"
+          className="w-44 rounded-lg border border-slate-700 bg-slate-800 px-3 py-1.5 text-sm text-slate-100 placeholder:text-slate-500 focus:border-emerald-500 focus:outline-none"
+        />
+        <select value={group} onChange={(e) => setGroup(e.target.value)} className="rounded-lg border border-slate-700 bg-slate-800 px-3 py-1.5 text-sm text-slate-100 focus:border-emerald-500 focus:outline-none">
+          <option value="">Tất cả nhóm tour</option>
+          {groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
+        </select>
+        <select value={sort} onChange={(e) => setSort(e.target.value as typeof sort)} className="rounded-lg border border-slate-700 bg-slate-800 px-3 py-1.5 text-sm text-slate-100 focus:border-emerald-500 focus:outline-none">
+          <option value="date">↕ Sắp xếp: Ngày khởi hành</option>
+          <option value="price">↕ Sắp xếp: Giá</option>
+          <option value="name">↕ Sắp xếp: Tên tour</option>
+        </select>
+        {(code || group) && (
+          <button onClick={() => { setCode(''); setGroup('') }} className="text-xs text-slate-400 underline hover:text-slate-200">Xóa lọc</button>
+        )}
+      </div>
+
       {error && <div className="mb-3 rounded-lg border border-red-800 bg-red-950/40 px-4 py-2 text-sm text-red-300">⚠️ {error} <button onClick={load} className="ml-2 underline">Thử lại</button></div>}
 
       {loading ? (
         <p className="text-slate-500">Đang tải lịch khởi hành...</p>
-      ) : tours.length === 0 ? (
-        <p className="py-10 text-center text-slate-500">Chưa có tour nào (đang hiển thị/ẩn) để xếp lịch.</p>
+      ) : sortedTours.length === 0 ? (
+        <p className="py-10 text-center text-slate-500">Không có tour công khai nào khớp bộ lọc.</p>
       ) : (
         <div className="overflow-x-auto rounded-xl border border-slate-800 bg-slate-950">
           {/* Hàng tiêu đề ngày */}
@@ -114,7 +157,7 @@ export function TourTimeline() {
           </div>
 
           {/* Mỗi tour một hàng */}
-          {tours.map((t) => (
+          {sortedTours.map((t) => (
             <div key={t.id} className="grid border-b border-slate-800 last:border-b-0 hover:bg-slate-900/40" style={{ gridTemplateColumns: cols }}>
               {/* Cột tên tour (sticky) */}
               <Link to={`/admin/tours/${t.id}/departures`} className="sticky left-0 z-10 flex items-center gap-2 bg-slate-950 px-3 py-2 hover:bg-slate-900">
@@ -164,8 +207,8 @@ export function TourTimeline() {
         </div>
       )}
 
-      {!loading && tours.length > 0 && (
-        <p className="mt-3 text-xs text-slate-500">{tours.length} tour · {totalDepartures} chuyến trong khung ngày. Bấm vào thanh/tên tour để mở quản lý chuyến khởi hành.</p>
+      {!loading && sortedTours.length > 0 && (
+        <p className="mt-3 text-xs text-slate-500">{sortedTours.length} tour công khai · {totalDepartures} chuyến trong khung ngày. Bấm vào thanh/tên tour để mở quản lý chuyến khởi hành.</p>
       )}
     </div>
   )

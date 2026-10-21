@@ -65,8 +65,17 @@ export async function toursTimeline(req, res, next) {
     const from = parseUtcDate(req.query.from)
     const to = parseUtcDate(req.query.to)
     if (!from || !to) return res.status(400).json({ message: 'Thiếu khoảng ngày (from, to)' })
+
+    // Chỉ hiển thị tour CÔNG KHAI (VISIBLE). Lọc theo mã tour + nhóm dịch vụ nếu có.
+    const where = { status: 'VISIBLE' }
+    if (req.query.code) where.tourCode = { contains: String(req.query.code) }
+    if (req.query.group) {
+      const ids = await tourIdsInGroup(Number(req.query.group))
+      where.id = { in: ids.length ? ids : [-1] }
+    }
+
     const tours = await prisma.tour.findMany({
-      where: { status: { in: ['VISIBLE', 'HIDDEN'] } }, // bỏ DRAFT (chưa có chuyến)
+      where,
       select: {
         id: true,
         title: true,
@@ -74,6 +83,7 @@ export async function toursTimeline(req, res, next) {
         slug: true,
         status: true,
         durationDays: true,
+        basePrice: true,
         thumbnail: true,
         region: { select: { name: true } },
         departures: {
