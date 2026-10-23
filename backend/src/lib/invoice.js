@@ -108,11 +108,11 @@ export async function reissueInvoice(bookingId, invoiceInfo) {
       ? `Xuất lại thay thế hóa đơn ${[invoice.invoiceSerial, invoice.invoiceNumber].filter(Boolean).join(' ')}`.slice(0, 2000)
       : null
 
+  // Giữ lại số/ký hiệu cũ trong lúc chờ phát hành để bộ đếm số hóa đơn vẫn thấy mốc cũ
+  // -> số thay thế = số lớn nhất + 1 (không trùng). Khi phát hành thành công sẽ ghi đè số mới.
   const data = {
     status: 'PENDING',
     retryCount: 0,
-    invoiceNumber: null,
-    invoiceSerial: null,
     reservationCode: null,
     pdfUrl: null,
     xmlUrl: null,

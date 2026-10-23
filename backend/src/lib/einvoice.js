@@ -53,11 +53,13 @@ function invoiceSerialForYear(year) {
   return `C${pad(year % 100, 2)}TBA`
 }
 
-// Số hóa đơn tăng dần toàn hệ thống (mô phỏng). Lấy số lớn nhất đã phát hành + 1.
+// Số hóa đơn tăng dần toàn hệ thống (mô phỏng). Lấy SỐ lớn nhất từng cấp + 1.
+// (Số 8 chữ số có đệm 0 nên thứ tự chuỗi trùng thứ tự số -> dùng orderBy invoiceNumber desc;
+//  nhờ vậy hóa đơn xuất lại/thay thế luôn nhận số mới, không trùng số cũ.)
 async function nextInvoiceNumber() {
   const last = await prisma.orderInvoice.findFirst({
     where: { invoiceNumber: { not: null } },
-    orderBy: { id: 'desc' },
+    orderBy: { invoiceNumber: 'desc' },
     select: { invoiceNumber: true },
   })
   const n = last?.invoiceNumber ? parseInt(last.invoiceNumber, 10) || 0 : 0
