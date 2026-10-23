@@ -18,6 +18,7 @@ import adminContactsRoutes from './routes/admin/contacts.routes.js'
 import adminServiceGroupsRoutes from './routes/admin/serviceGroups.routes.js'
 import adminNewsletterRoutes from './routes/admin/newsletter.routes.js'
 import adminInvoicesRoutes from './routes/admin/invoices.routes.js'
+import adminCancellationPoliciesRoutes from './routes/admin/cancellationPolicies.routes.js'
 import contactRoutes from './routes/contact.routes.js'
 import invoicesRoutes from './routes/invoices.routes.js'
 import newsletterRoutes from './routes/newsletter.routes.js'
@@ -77,6 +78,7 @@ app.use('/api/admin/contacts', adminContactsRoutes)
 app.use('/api/admin/service-groups', adminServiceGroupsRoutes)
 app.use('/api/admin/newsletter', adminNewsletterRoutes)
 app.use('/api/admin/invoices', adminInvoicesRoutes)
+app.use('/api/admin/cancellation-policies', adminCancellationPoliciesRoutes)
 app.use('/api/catalog', catalogRoutes)
 app.use('/api/bookings', bookingsRoutes)
 app.use('/api/favorites', favoritesRoutes)

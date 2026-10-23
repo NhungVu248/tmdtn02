@@ -28,6 +28,7 @@ import { AdminOrderDetailPage } from './pages/admin/AdminOrderDetailPage'
 import { AdminInvoicePage } from './pages/admin/AdminInvoicePage'
 import { AdminInvoicesPage } from './pages/admin/AdminInvoicesPage'
 import { AdminPaymentsPage } from './pages/admin/AdminPaymentsPage'
+import { AdminCancellationPoliciesPage } from './pages/admin/AdminCancellationPoliciesPage'
 import { AdminUsersPage } from './pages/admin/AdminUsersPage'
 import { AdminDiscountsPage } from './pages/admin/AdminDiscountsPage'
 import { AdminPromotionsPage } from './pages/admin/AdminPromotionsPage'
@@ -127,6 +128,8 @@ function App() {
           <Route path="service-groups" element={<AdminServiceGroupsPage />} />
           {/* Phương thức thanh toán & phí & thuế */}
           <Route path="payments" element={<AdminPaymentsPage />} />
+          {/* UC-14/UC-23 – Chính sách hủy dùng chung */}
+          <Route path="cancellation-policies" element={<AdminCancellationPoliciesPage />} />
           {/* UC-23 – Cấu hình hệ thống & nhật ký */}
           <Route path="settings" element={<AdminConfigPage />} />
         </Route>

@@ -524,6 +524,33 @@ export const adminApi = {
     }
     return res.json() as Promise<{ filename: string; url: string }>
   },
+
+  // Chính sách hủy dùng chung (UC-14/UC-23)
+  listCancellationPolicies: () => get<{ items: CancellationPolicy[] }>('/api/admin/cancellation-policies'),
+  createCancellationPolicy: (data: CancellationPolicyInput) =>
+    post<{ policy: CancellationPolicy }>('/api/admin/cancellation-policies', data),
+  updateCancellationPolicy: (id: number, data: CancellationPolicyInput) =>
+    patchReq<{ policy: CancellationPolicy }>(`/api/admin/cancellation-policies/${id}`, data),
+  deleteCancellationPolicy: (id: number) =>
+    del<{ ok: boolean; detached: number }>(`/api/admin/cancellation-policies/${id}`),
+}
+
+export type PolicyMilestone = { daysBefore: number; refundRate: number }
+export type CancellationPolicy = {
+  id: number
+  name: string
+  isRefundable: boolean
+  freeHours: number
+  milestones: PolicyMilestone[]
+  usage?: number
+  createdAt: string
+  updatedAt: string
+}
+export type CancellationPolicyInput = {
+  name: string
+  isRefundable: boolean
+  freeHours: number
+  milestones: PolicyMilestone[]
 }
 
 export type AdminInvoiceStatus = 'PENDING' | 'PROCESSING' | 'ISSUED' | 'FAILED' | 'CANCELED'

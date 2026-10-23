@@ -36,6 +36,7 @@ const NAV_GROUPS: { title: string; items: { to: string; label: string; icon: str
       { to: '/admin/users', label: 'Người dùng', icon: '☺' },
       { to: '/admin/admins', label: 'Tài khoản quản trị', icon: '🔑', superOnly: true },
       { to: '/admin/payments', label: 'Phương thức thanh toán & phí', icon: '💳' },
+      { to: '/admin/cancellation-policies', label: 'Chính sách hủy', icon: '↩' },
       { to: '/admin/settings', label: 'Cấu hình hệ thống', icon: '⚙' },
     ],
   },
@@ -57,6 +58,7 @@ const TITLES: { prefix: string; label: string }[] = [
   { prefix: '/admin/users', label: 'Quản lý người dùng' },
   { prefix: '/admin/admins', label: 'Quản lý tài khoản quản trị' },
   { prefix: '/admin/payments', label: 'Phương thức thanh toán & phí' },
+  { prefix: '/admin/cancellation-policies', label: 'Chính sách hủy' },
   { prefix: '/admin/settings', label: 'Cấu hình hệ thống' },
 ]
 
