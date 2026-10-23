@@ -359,9 +359,12 @@ export const adminApi = {
       { rows },
     ),
   getOrder: (code: string) =>
-    get<{ order: AdminOrderDetail; payments: AdminPayment[]; refundRequests: AdminRefundRequest[] }>(
+    get<{ order: AdminOrderDetail; payments: AdminPayment[]; refundRequests: AdminRefundRequest[]; invoice: OrderInvoiceInfo | null }>(
       `/api/admin/orders/${code}`,
     ),
+  // Xuất lại / phát hành lại hóa đơn điện tử của đơn (có thể sửa thông tin người mua).
+  reissueOrderInvoice: (code: string, info?: { taxCode?: string; companyName?: string; companyAddress?: string; invoiceEmail?: string }) =>
+    post<{ ok: boolean; invoice: OrderInvoiceInfo | null }>(`/api/admin/orders/${code}/invoice/reissue`, info ?? {}),
   updateOrderStatus: (code: string, status: string) =>
     patchReq<{ order: AdminOrderDetail }>(`/api/admin/orders/${code}/status`, { status }),
   setOrderPayment: (code: string, body: { mark?: 'FULL' | 'DEPOSIT' | 'NONE'; paidAmount?: number }) =>
@@ -554,6 +557,27 @@ export type CancellationPolicyInput = {
 }
 
 export type AdminInvoiceStatus = 'PENDING' | 'PROCESSING' | 'ISSUED' | 'FAILED' | 'CANCELED'
+
+// Hóa đơn điện tử gắn với một đơn (trả kèm trong getOrder) — bản ghi OrderInvoice thô.
+export interface OrderInvoiceInfo {
+  id: number
+  bookingId: number
+  taxCode: string | null
+  companyName: string | null
+  companyAddress: string | null
+  invoiceEmail: string
+  status: AdminInvoiceStatus
+  invoiceNumber: string | null
+  invoiceSerial: string | null
+  reservationCode: string | null
+  pdfUrl: string | null
+  xmlUrl: string | null
+  errorLog: string | null
+  retryCount: number
+  issuedAt: string | null
+  createdAt: string
+  updatedAt: string
+}
 
 export interface AdminInvoice {
   id: number

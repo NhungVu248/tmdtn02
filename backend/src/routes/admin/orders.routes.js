@@ -1,5 +1,5 @@
 import { Router } from 'express'
-import { bulkUpdateOrderStatus, getOrder, listOrders, processRefund, setOrderPayment, updateOrderStatus } from '../../controllers/admin/orders.controller.js'
+import { bulkUpdateOrderStatus, getOrder, listOrders, processRefund, reissueOrderInvoice, setOrderPayment, updateOrderStatus } from '../../controllers/admin/orders.controller.js'
 import { requireAdmin } from '../../middleware/adminAuth.middleware.js'
 
 const router = Router()
@@ -14,5 +14,6 @@ router.get('/:code', getOrder)
 router.patch('/:code/status', updateOrderStatus)
 router.patch('/:code/payment', setOrderPayment)
 router.post('/:code/refunds/:refundId/process', processRefund)
+router.post('/:code/invoice/reissue', reissueOrderInvoice)
 
 export default router

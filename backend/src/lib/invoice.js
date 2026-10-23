@@ -95,6 +95,42 @@ export async function maybeIssueInvoice(bookingId) {
   }
 }
 
+// Xuất lại hóa đơn theo yêu cầu khách (hóa đơn thay thế): hủy hiệu lực số cũ, đặt lại về PENDING
+// rồi phát hành số mới. Cho phép cập nhật thông tin người mua khi xuất lại (nếu gửi kèm).
+// Dùng cho cả trường hợp hóa đơn đã ISSUED (xuất lại/thay thế) lẫn FAILED/PENDING/CANCELED (phát hành lại).
+export async function reissueInvoice(bookingId, invoiceInfo) {
+  const invoice = await prisma.orderInvoice.findUnique({ where: { bookingId } })
+  if (!invoice) return null
+
+  // Ghi vết số hóa đơn cũ khi thay thế một hóa đơn đã phát hành.
+  const replaceNote =
+    invoice.status === 'ISSUED' && invoice.invoiceNumber
+      ? `Xuất lại thay thế hóa đơn ${[invoice.invoiceSerial, invoice.invoiceNumber].filter(Boolean).join(' ')}`.slice(0, 2000)
+      : null
+
+  const data = {
+    status: 'PENDING',
+    retryCount: 0,
+    invoiceNumber: null,
+    invoiceSerial: null,
+    reservationCode: null,
+    pdfUrl: null,
+    xmlUrl: null,
+    issuedAt: null,
+    errorLog: replaceNote,
+  }
+  // Cập nhật thông tin người mua nếu khách yêu cầu sửa khi xuất lại.
+  if (invoiceInfo) {
+    if (invoiceInfo.invoiceEmail != null && String(invoiceInfo.invoiceEmail).trim()) data.invoiceEmail = String(invoiceInfo.invoiceEmail).trim()
+    if (invoiceInfo.taxCode !== undefined) data.taxCode = invoiceInfo.taxCode?.trim() || null
+    if (invoiceInfo.companyName !== undefined) data.companyName = invoiceInfo.companyName?.trim() || null
+    if (invoiceInfo.companyAddress !== undefined) data.companyAddress = invoiceInfo.companyAddress?.trim() || null
+  }
+
+  await prisma.orderInvoice.update({ where: { bookingId }, data })
+  return maybeIssueInvoice(bookingId) // phát hành ngay nếu đơn đã thu đủ; ngược lại giữ PENDING
+}
+
 // Hủy hóa đơn (khi hoàn tiền hoặc admin hủy): chuyển CANCELED + gửi biên bản hủy mô phỏng.
 export async function cancelInvoice(bookingId, reason) {
   const invoice = await prisma.orderInvoice.findUnique({

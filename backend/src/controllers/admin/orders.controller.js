@@ -4,7 +4,7 @@ import { nightsBetween } from '../../lib/booking.js'
 import { sendOrderStatusEmail, sendRefundProcessedEmail, sendTourVoucherEmail } from '../../lib/mailer.js'
 import { paymentState, outstanding, payableTotal, fullPaymentDeadline, codDeadline } from '../../lib/payment.js'
 import { consumeDiscountIfAny } from '../../lib/discount.js'
-import { maybeIssueInvoice, cancelInvoice } from '../../lib/invoice.js'
+import { maybeIssueInvoice, cancelInvoice, reissueInvoice } from '../../lib/invoice.js'
 
 // BR-85: vòng đời đơn — mọi chuyển trạng thái không có trong danh sách đều bị từ chối.
 const TRANSITIONS = {
@@ -360,6 +360,37 @@ export async function processRefund(req, res, next) {
     }).catch((e) => console.error('Gửi email hoàn tiền thất bại:', e))
 
     res.json({ refund: updated })
+  } catch (err) {
+    next(err)
+  }
+}
+
+// POST /api/admin/orders/:code/invoice/reissue — xuất lại / phát hành lại hóa đơn điện tử của đơn.
+// Dùng khi khách yêu cầu xuất lại (hóa đơn thay thế) hoặc phát hành lại hóa đơn đang lỗi/chờ.
+// Cho phép sửa thông tin người mua (taxCode/companyName/companyAddress/invoiceEmail) khi xuất lại.
+export async function reissueOrderInvoice(req, res, next) {
+  try {
+    const code = String(req.params.code || '').trim().toUpperCase()
+    const booking = await prisma.booking.findUnique({ where: { code }, select: { id: true } })
+    if (!booking) return res.status(404).json({ message: 'Không tìm thấy đơn' })
+
+    const invoice = await prisma.orderInvoice.findUnique({ where: { bookingId: booking.id } })
+    if (!invoice) return res.status(404).json({ message: 'Đơn này chưa có yêu cầu xuất hóa đơn.' })
+
+    const info = {
+      taxCode: req.body?.taxCode,
+      companyName: req.body?.companyName,
+      companyAddress: req.body?.companyAddress,
+      invoiceEmail: req.body?.invoiceEmail,
+    }
+    const result = await reissueInvoice(booking.id, info)
+    await logAdminAction(req.admin.sub, 'invoice.reissue', { entityType: 'OrderInvoice', entityId: invoice.id, detail: { code, status: result?.status } })
+
+    if (result?.status === 'ISSUED') return res.json({ ok: true, invoice: result })
+    if (result?.status === 'PENDING') {
+      return res.status(409).json({ message: 'Đơn chưa thu đủ tiền — hóa đơn sẽ tự phát hành khi thanh toán đủ.', invoice: result })
+    }
+    return res.status(502).json({ message: result?.errorLog || 'Xuất lại hóa đơn thất bại, vui lòng thử lại sau.', invoice: result })
   } catch (err) {
     next(err)
   }

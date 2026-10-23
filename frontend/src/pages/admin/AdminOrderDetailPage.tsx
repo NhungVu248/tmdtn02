@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { AdminApiError, adminApi, type AdminOrderDetail, type AdminPayment, type AdminRefundRequest } from '../../lib/adminApi'
+import { AdminApiError, adminApi, type AdminOrderDetail, type AdminPayment, type AdminRefundRequest, type OrderInvoiceInfo } from '../../lib/adminApi'
 
 const STATUS_LABEL: Record<string, string> = {
   PENDING_DEPOSIT: 'Chờ cọc',
@@ -13,12 +13,23 @@ const STATUS_LABEL: Record<string, string> = {
 const fmt = (n: number) => n.toLocaleString('vi-VN') + '₫'
 const fmtDate = (s: string | null) => (s ? new Date(s).toLocaleString('vi-VN') : '-')
 
+const INVOICE_STATUS: Record<string, { label: string; cls: string }> = {
+  PENDING: { label: 'Chờ phát hành', cls: 'bg-amber-900 text-amber-300' },
+  PROCESSING: { label: 'Đang xử lý', cls: 'bg-blue-900 text-blue-300' },
+  ISSUED: { label: 'Đã phát hành', cls: 'bg-emerald-900 text-emerald-300' },
+  FAILED: { label: 'Phát hành lỗi', cls: 'bg-red-950 text-red-300' },
+  CANCELED: { label: 'Đã hủy', cls: 'bg-slate-800 text-slate-400' },
+}
+
 // UC-18 – Chi tiết đơn: chuyển trạng thái theo vòng đời (BR-85) + xử lý hoàn tiền đang chờ (BR-86/87).
 export function AdminOrderDetailPage() {
   const { code } = useParams<{ code: string }>()
   const [order, setOrder] = useState<AdminOrderDetail | null>(null)
   const [payments, setPayments] = useState<AdminPayment[]>([])
   const [refunds, setRefunds] = useState<AdminRefundRequest[]>([])
+  const [invoice, setInvoice] = useState<OrderInvoiceInfo | null>(null)
+  // Form xuất lại hóa đơn (mở khi bấm "Xuất lại"); cho sửa thông tin người mua.
+  const [reissue, setReissue] = useState<{ taxCode: string; companyName: string; companyAddress: string; invoiceEmail: string } | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [info, setInfo] = useState<string | null>(null)
@@ -34,6 +45,7 @@ export function AdminOrderDetailPage() {
         setOrder(r.order)
         setPayments(r.payments)
         setRefunds(r.refundRequests)
+        setInvoice(r.invoice)
       })
       .catch(() => setError('Không tải được đơn'))
       .finally(() => setLoading(false))
@@ -89,6 +101,23 @@ export function AdminOrderDetailPage() {
       load()
     } catch (err) {
       setError(err instanceof AdminApiError ? err.message : 'Xử lý hoàn tiền thất bại') // 4a
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  // Xuất lại / phát hành lại hóa đơn điện tử (gửi kèm thông tin người mua đã sửa nếu có).
+  async function doReissue() {
+    if (!code) return
+    setError(null); setInfo(null); setBusy(true)
+    try {
+      const r = await adminApi.reissueOrderInvoice(code, reissue ?? undefined)
+      setInvoice(r.invoice)
+      setInfo(r.invoice?.status === 'ISSUED' ? `✓ Đã xuất lại hóa đơn (số ${r.invoice.invoiceSerial ?? ''} ${r.invoice.invoiceNumber ?? ''}).` : '✓ Đã gửi yêu cầu xuất lại hóa đơn.')
+      setReissue(null)
+      load()
+    } catch (err) {
+      setError(err instanceof AdminApiError ? err.message : 'Xuất lại hóa đơn thất bại')
     } finally {
       setBusy(false)
     }
@@ -195,6 +224,94 @@ export function AdminOrderDetailPage() {
             </div>
           )}
         </div>
+      </div>
+
+      {/* Hóa đơn điện tử: thông tin xuất hóa đơn + xuất lại theo yêu cầu khách */}
+      <div className="mb-6 rounded-xl border border-slate-800 bg-slate-950 p-5">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <h2 className="flex items-center gap-2 font-semibold text-slate-200">
+            🧾 Hóa đơn điện tử
+            {invoice && (
+              <span className={`rounded-full px-2 py-0.5 text-xs ${INVOICE_STATUS[invoice.status]?.cls ?? 'bg-slate-800 text-slate-400'}`}>
+                {INVOICE_STATUS[invoice.status]?.label ?? invoice.status}
+              </span>
+            )}
+          </h2>
+          {invoice && !reissue && (
+            <button
+              disabled={busy || invoice.status === 'PROCESSING'}
+              onClick={() => setReissue({ taxCode: invoice.taxCode ?? '', companyName: invoice.companyName ?? '', companyAddress: invoice.companyAddress ?? '', invoiceEmail: invoice.invoiceEmail })}
+              className="rounded-lg border border-emerald-700 px-3 py-1.5 text-sm text-emerald-300 hover:bg-emerald-950/40 disabled:opacity-50"
+            >
+              {invoice.status === 'ISSUED' ? '🔁 Xuất lại hóa đơn' : '↻ Phát hành lại'}
+            </button>
+          )}
+        </div>
+
+        {!invoice ? (
+          <p className="text-sm text-slate-500">Khách không yêu cầu xuất hóa đơn điện tử cho đơn này.</p>
+        ) : (
+          <>
+            <div className="grid gap-x-8 gap-y-1 text-sm sm:grid-cols-2">
+              <Row label="Người mua" value={invoice.companyName || order.guestName} />
+              <Row label="Mã số thuế" value={invoice.taxCode || '(cá nhân)'} />
+              <Row label="Địa chỉ" value={invoice.companyAddress || '-'} />
+              <Row label="Email nhận HĐ" value={invoice.invoiceEmail} />
+              {invoice.status === 'ISSUED' && (
+                <>
+                  <Row label="Ký hiệu / Số HĐ" value={`${invoice.invoiceSerial ?? '-'} · ${invoice.invoiceNumber ?? '-'}`} />
+                  <Row label="Mã tra cứu" value={invoice.reservationCode || '-'} />
+                  <Row label="Phát hành lúc" value={fmtDate(invoice.issuedAt)} />
+                </>
+              )}
+            </div>
+
+            {invoice.status === 'ISSUED' && invoice.pdfUrl && (
+              <a href={invoice.pdfUrl} target="_blank" rel="noreferrer" className="mt-3 inline-block rounded-lg border border-slate-700 px-3 py-1.5 text-sm text-slate-200 hover:bg-slate-800">
+                📄 Xem hóa đơn (PDF)
+              </a>
+            )}
+            {invoice.status === 'FAILED' && invoice.errorLog && (
+              <p className="mt-3 rounded-lg border border-red-900 bg-red-950/30 px-3 py-2 text-xs text-red-300">
+                Lỗi phát hành (đã thử {invoice.retryCount} lần): {invoice.errorLog}
+              </p>
+            )}
+            {invoice.status !== 'FAILED' && invoice.errorLog && (
+              <p className="mt-3 text-xs text-slate-500">Ghi chú: {invoice.errorLog}</p>
+            )}
+
+            {/* Form xuất lại: cho sửa thông tin người mua trước khi phát hành lại */}
+            {reissue && (
+              <div className="mt-4 space-y-3 rounded-lg border border-emerald-800/50 bg-emerald-950/10 p-4">
+                <p className="text-xs text-slate-400">
+                  {invoice.status === 'ISSUED'
+                    ? 'Hóa đơn hiện tại sẽ được thay thế bằng hóa đơn mới. Có thể sửa thông tin người mua bên dưới.'
+                    : 'Phát hành lại hóa đơn. Có thể sửa thông tin người mua bên dưới.'}
+                </p>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <label className="flex flex-col gap-1 text-xs text-slate-400">Mã số thuế (để trống = cá nhân)
+                    <input className="rounded border border-slate-700 bg-slate-800 px-2 py-1.5 text-sm text-slate-100" value={reissue.taxCode} onChange={(e) => setReissue({ ...reissue, taxCode: e.target.value })} />
+                  </label>
+                  <label className="flex flex-col gap-1 text-xs text-slate-400">Email nhận hóa đơn
+                    <input className="rounded border border-slate-700 bg-slate-800 px-2 py-1.5 text-sm text-slate-100" value={reissue.invoiceEmail} onChange={(e) => setReissue({ ...reissue, invoiceEmail: e.target.value })} />
+                  </label>
+                  <label className="flex flex-col gap-1 text-xs text-slate-400">Tên công ty
+                    <input className="rounded border border-slate-700 bg-slate-800 px-2 py-1.5 text-sm text-slate-100" value={reissue.companyName} onChange={(e) => setReissue({ ...reissue, companyName: e.target.value })} />
+                  </label>
+                  <label className="flex flex-col gap-1 text-xs text-slate-400">Địa chỉ công ty
+                    <input className="rounded border border-slate-700 bg-slate-800 px-2 py-1.5 text-sm text-slate-100" value={reissue.companyAddress} onChange={(e) => setReissue({ ...reissue, companyAddress: e.target.value })} />
+                  </label>
+                </div>
+                <div className="flex gap-2">
+                  <button disabled={busy || !reissue.invoiceEmail.trim()} onClick={doReissue} className="rounded-lg bg-emerald-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50">
+                    {busy ? 'Đang xử lý...' : 'Xác nhận xuất lại'}
+                  </button>
+                  <button disabled={busy} onClick={() => setReissue(null)} className="rounded-lg border border-slate-700 px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-800 disabled:opacity-50">Hủy</button>
+                </div>
+              </div>
+            )}
+          </>
+        )}
       </div>
 
       {/* Yêu cầu của khách hàng (từ trường ghi chú khi đặt) */}
